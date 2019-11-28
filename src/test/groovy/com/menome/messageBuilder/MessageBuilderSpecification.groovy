@@ -12,9 +12,9 @@ class MessageBuilderSpecification extends Specification {
         message.Name == "Todd Costella"
     }
 
-    def "all entity properties"(){
+    def "all entity properties"() {
         given:
-        def message = MessageBuilder.builder().Name("Todd Costella").NodeType("Employee").Priority(1).SourceSystem("HRSystem").ConformedDimensions(["Email":"ToddCostella@gmail.com","EmployeeId":12345]).build()
+        def message = MessageBuilder.builder().Name("Todd Costella").NodeType("Employee").Priority(1).SourceSystem("HRSystem").ConformedDimensions(["Email": "ToddCostella@gmail.com", "EmployeeId": 12345]).build()
         expect:
         message.Name == "Todd Costella"
         message.NodeType == "Employee"
@@ -24,15 +24,111 @@ class MessageBuilderSpecification extends Specification {
         message.ConformedDimensions.EmployeeId == 12345
     }
 
-    def "entity as json"(){
+    def "entity as json"() {
         given:
-        def message = MessageBuilder.builder().Name("Todd Costella").NodeType("Employee").Priority(1).SourceSystem("HRSystem").ConformedDimensions(["Email":"ToddCostella@gmail.com","EmployeeId":12345]).build()
-        def json = JsonOutput.toJson(message)
+        def message = MessageBuilder.builder().Name("Todd Costella").NodeType("Employee").Priority(1).SourceSystem("HRSystem").ConformedDimensions(["Email": "ToddCostella@gmail.com", "EmployeeId": 12345]).build()
+        def json = message.toJSON()
         expect:
-        json == /{"sourceSystem":"HRSystem","nodeType":"Employee","conformedDimensions":{"Email":"ToddCostella@gmail.com","EmployeeId":12345},"priority":1,"name":"Todd Costella"}/
+        json == /{"Name":"Todd Costella","NodeType":"Employee","Priority":1,"SourceSystem":"HRSystem","ConformedDimensions":{"Email":"ToddCostella@gmail.com","EmployeeId":12345}}/
+    }
 
+    def "entity with properties"() {
+        given:
+        def message = MessageBuilder.builder()
+                .Name("Todd Costella")
+                .NodeType("Employee")
+                .Priority(1)
+                .SourceSystem("HRSystem")
+                .ConformedDimensions(["Email": "ToddCostella@gmail.com", "EmployeeId": 12345])
+                .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
+                .build()
+        def json = message.toJSON()
+        expect:
+        json == /{"Name":"Todd Costella","NodeType":"Employee","Priority":1,"SourceSystem":"HRSystem","ConformedDimensions":{"Email":"ToddCostella@gmail.com","EmployeeId":12345},"Properties":{"Status":"active","PreferredName":"The Chazzinator","ResumeSkills":"programming,peeling bananas from the wrong end,handstands,sweet kickflips"}}/
 
+    }
 
+    def "entity with properties and connections"() {
+        given:
+
+        def office = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
+        def project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
+        def team = Connection.builder().Name("theLink Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
+        def message = MessageBuilder.builder()
+                .Name("Todd Costella")
+                .NodeType("Employee")
+                .Priority(1)
+                .SourceSystem("HRSystem")
+                .ConformedDimensions(["Email": "ToddCostella@gmail.com", "EmployeeId": 12345])
+                .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
+                .Connections([office, project, team])
+                .build()
+        def json = message.toJSON()
+        expect:
+        json == /{"Name":"Todd Costella","NodeType":"Employee","Priority":1,"SourceSystem":"HRSystem","ConformedDimensions":{"Email":"ToddCostella@gmail.com","EmployeeId":12345},"Properties":{"Status":"active","PreferredName":"The Chazzinator","ResumeSkills":"programming,peeling bananas from the wrong end,handstands,sweet kickflips"},"Connections":[{"Name":"Menome Victoria","NodeType":"Office","RelType":"LocatedInOffice","ForwardRel":true,"ConformedDimensions":{"City":"Victoria"}},{"Name":"theLink","NodeType":"Project","RelType":"WorkedOnProject","ForwardRel":true,"ConformedDimensions":{"Code":"5"}},{"Name":"theLink Product Team","NodeType":"Team","Label":"Facet","RelType":"HAS_FACET","ForwardRel":true,"ConformedDimensions":{"Code":"1337"}}]}/
+    }
+
+    def "pretty print comparison against menome github exmaple"(){
+        def office = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
+        def project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
+        def team = Connection.builder().Name("theLink Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
+        def message = MessageBuilder.builder()
+                .Name("Konrad Aust")
+                .NodeType("Employee")
+                .Priority(1)
+                .SourceSystem("HRSystem")
+                .ConformedDimensions(["Email": "konrad.aust@menome.com", "EmployeeId": 12345])
+                .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
+                .Connections([office, project, team])
+                .build()
+        def json = message.toJSONPretty()
+
+        expect:
+        json == '''{
+  "Name": "Konrad Aust",
+  "NodeType": "Employee",
+  "Priority": 1,
+  "SourceSystem": "HRSystem",
+  "ConformedDimensions": {
+    "Email": "konrad.aust@menome.com",
+    "EmployeeId": 12345
+  },
+  "Properties": {
+    "Status": "active",
+    "PreferredName": "The Chazzinator",
+    "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"
+  },
+  "Connections": [
+    {
+      "Name": "Menome Victoria",
+      "NodeType": "Office",
+      "RelType": "LocatedInOffice",
+      "ForwardRel": true,
+      "ConformedDimensions": {
+        "City": "Victoria"
+      }
+    },
+    {
+      "Name": "theLink",
+      "NodeType": "Project",
+      "RelType": "WorkedOnProject",
+      "ForwardRel": true,
+      "ConformedDimensions": {
+        "Code": "5"
+      }
+    },
+    {
+      "Name": "theLink Product Team",
+      "NodeType": "Team",
+      "Label": "Facet",
+      "RelType": "HAS_FACET",
+      "ForwardRel": true,
+      "ConformedDimensions": {
+        "Code": "1337"
+      }
+    }
+  ]
+}'''
     }
 }
 
