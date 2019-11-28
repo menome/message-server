@@ -1,7 +1,6 @@
 package com.menome.messageBuilder
 
 
-import groovy.json.JsonOutput
 import spock.lang.Specification
 
 class MessageBuilderSpecification extends Specification {
