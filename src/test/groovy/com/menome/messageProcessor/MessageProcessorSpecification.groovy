@@ -14,15 +14,6 @@ class MessageProcessorSpecification extends Specification {
             .build()
             .toJSON()
 
-    def "process invalid empty message"() {
-        given:
-        def msg = ""
-        MessageProcessor processor = new MessageProcessor()
-        processor.process(msg)
-        expect:
-        processor.getNeo4JStatements().isEmpty()
-    }
-
     MessageProcessor processSimpleMessage() {
         MessageProcessor processor = new MessageProcessor()
         processor.process(simpleMessage)
@@ -37,6 +28,15 @@ class MessageProcessorSpecification extends Specification {
             }
         }
         return index
+    }
+
+    def "process invalid empty message"() {
+        given:
+        def msg = ""
+        MessageProcessor processor = new MessageProcessor()
+        processor.process(msg)
+        expect:
+        processor.getNeo4JStatements().isEmpty()
     }
 
 
