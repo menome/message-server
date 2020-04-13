@@ -51,6 +51,21 @@ class MessageProcessor {
 
     def List<String> processMerges(Map msgMap) {
         def mergeStatements = []
-        mergeStatements
+        // Card Merge MERGE (node:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})
+        def cardMerge = "MERGE (node:Card: $msgMap.NodeType "
+
+        Map conformedDimensions = msgMap.ConformedDimensions
+        if (conformedDimensions) {
+            cardMerge += "{"
+            conformedDimensions.eachWithIndex { key, value, index ->
+                cardMerge += "$key: $value" + (index < conformedDimensions.size() - 1 ? "," : "")
+            }
+            cardMerge += "})"
+        }
+
+        cardMerge += " ON CREATE SET node.Uuid = {newUuid}"
+        cardMerge += " SET node += {nodeParams}"
+        cardMerge += " SET node.TheLinkAddedDate = datetime()"
+        mergeStatements << cardMerge
     }
 }

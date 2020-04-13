@@ -29,7 +29,11 @@ class MessageProcessorSpecification extends Specification {
         List<String> statements = processor.getNeo4JStatements()
 
         expect:
-        def expectedStatements = ["CREATE INDEX ON :Card(Email,EmployeeId)", "CREATE INDEX ON :Employee(Email,EmployeeId)"]
+        def expectedStatements = [
+                "CREATE INDEX ON :Card(Email,EmployeeId)"
+                ,"CREATE INDEX ON :Employee(Email,EmployeeId)"
+                ,"MERGE (node:Card:Employee {Email: \"konrad.aust@menome.com\",EmployeeId: 12345}) ON CREATE SET node.Uuid = {newUuid} SET node += {nodeParams} SET node.TheLinkAddedDate = datetime()"
+        ]
         statements.size() == expectedStatements.size()
         expectedStatements.each() { statement ->
             statements.contains(statement)
