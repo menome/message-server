@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory
 class MessageProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageProcessor.class)
-
     static statements = []
 
     static process(String msg) {
@@ -20,18 +19,29 @@ class MessageProcessor {
 
     static List<String> processMerges(String msg) {
         if (msg) {
-            def parser = new JsonSlurper()
-            def msgMap = parser.parseText(msg) as Map
-            return processMerges(msgMap)
+            return processMerges(buildJSonParserfromMessage(msg), new NodeType("", NodeType.Type.PRIMARY))
         }
     }
 
+
     static List<String> processIndexes(String msg) {
         if (msg) {
-            def parser = new JsonSlurper()
-            def msgMap = parser.parseText(msg) as Map
-            return processIndexes(msgMap)
+            processIndexes(buildJSonParserfromMessage(msg))
         }
+    }
+
+    static List<String> processConnectedNodes(String msg) {
+        if (msg) {
+            processConnectedNodes(buildJSonParserfromMessage(msg))
+        }
+
+    }
+
+
+    private static Map buildJSonParserfromMessage(String msg) {
+        def parser = new JsonSlurper()
+        def msgMap = parser.parseText(msg) as Map
+        msgMap
     }
 
     static List<String> getNeo4JStatements() {
@@ -51,23 +61,11 @@ class MessageProcessor {
         }
         indexStatements
     }
-    //MERGE (node:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})ON CREATE SET node.Uuid = {newUuid}SET node += {nodeParams}SET node.TheLinkAddedDate = datetime();
-    /* nodeParams:
-        {
-            Email: 'konrad.aust@menome.com',
-            EmployeeId: 12345,
-            Name: 'Konrad Aust',
-            PendingMerge: false,
-            SourceSystems: [ 'HRSystem' ],
-            SourceSystemPriorities: [ 1 ],
-            SourceSystemProps_HRSystem: []
-        }
-    */
 
-    def static List<String> processMerges(Map msgMap) {
+    static List<String> processMerges(Map msgMap, NodeType nodeType) {
         def mergeStatements = []
         // Card Merge MERGE (node:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})
-        def cardMerge = "MERGE (node:Card:$msgMap.NodeType "
+        def cardMerge = "MERGE (node${nodeType.nodeSuffix}:Card:$msgMap.NodeType "
 
         def conformedDimensions = msgMap.ConformedDimensions
         if (conformedDimensions) {
@@ -84,9 +82,35 @@ class MessageProcessor {
             cardMerge += "})"
         }
 
-        cardMerge += " ON CREATE SET node.Uuid = {newUuid}"
-        cardMerge += " SET node += {nodeParams}"
-        cardMerge += " SET node.TheLinkAddedDate = datetime()"
+        cardMerge += " ON CREATE SET node${nodeType.nodeSuffix}.Uuid = apoc.create.uuid(),node${nodeType.nodeSuffix}.TheLinkAddedDate = datetime()"
+
+        if (nodeType.nodeType == NodeType.Type.PRIMARY) {
+            cardMerge += " SET node${nodeType.nodeSuffix} += {nodeParams}"
+        } else {
+            cardMerge += " SET node${nodeType.nodeSuffix}.PendingMerge = true"
+        }
         mergeStatements << cardMerge
+    }
+
+
+    static List<String> processConnectedNodes(Map msgMap) {
+        List<String> connectedNodeMergeStatements = []
+        msgMap.Connections.eachWithIndex { Map map, Integer index ->
+            connectedNodeMergeStatements.addAll(processMerges(map, new NodeType(index as String, NodeType.Type.RELATED)))
+        }
+        connectedNodeMergeStatements
+    }
+}
+
+class NodeType {
+    String nodeSuffix
+    enum Type {
+        PRIMARY, RELATED
+    }
+    Type nodeType
+
+    NodeType(String nodeSuffix, NodeType.Type type) {
+        this.nodeSuffix = nodeSuffix
+        this.nodeType = type
     }
 }

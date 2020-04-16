@@ -16,6 +16,7 @@ class RabbitMQVolumeSpecification extends MenomeContainerSpecification {
         (1..5000).each { rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, msg.getBytes()) }
         then:
         1 == 1
-        keepContainersRunningFor10Minutes()
+        //keepContainersRunningFor10Minutes()
+        sleep(10000000000)
     }
 }

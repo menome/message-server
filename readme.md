@@ -54,16 +54,22 @@ MERGE (node:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})
 ON CREATE SET node.Uuid = {newUuid}
 SET node += {nodeParams}
 SET node.TheLinkAddedDate = datetime()
+
 MERGE (node0:Card:Office {City: "Victoria"})
 ON CREATE SET node0.Uuid = {node0_newUuid}, node0.PendingMerge = true
+
 MERGE (node)-[node0_rel:LocatedInOffice]->(node0)
 SET node0_rel += {node0_relProps}, node0 += {node0_nodeParams}
+
 MERGE (node1:Card:Project {Code: "5"})
 ON CREATE SET node1.Uuid = {node1_newUuid}, node1.PendingMerge = true
+
 MERGE (node)-[node1_rel:WorkedOnProject]->(node1)
 SET node1_rel += {node1_relProps}, node1 += {node1_nodeParams}
+
 MERGE (node2:Facet:Team {Code: "1337"})
 ON CREATE SET node2.Uuid = {node2_newUuid}, node2.PendingMerge = true
+
 MERGE (node)-[node2_rel:HAS_FACET]->(node2)
 SET node2_rel += {node2_relProps}, node2 += {node2_nodeParams};
 ```
