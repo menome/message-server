@@ -97,7 +97,7 @@ class MessageProcessorSpecification extends Specification {
         List<String> mergeStatements = processor.processMerges(simpleMessage)
         expect:
         mergeStatements.size() == 1
-        mergeStatements[0] == "MERGE (node:Card:Employee {Email: \"konrad.aust@menome.com\",EmployeeId: 12345}) ON CREATE SET node.Uuid = apoc.create.uuid(),node.TheLinkAddedDate = datetime() SET node += {nodeParams}"
+        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: \"konrad.aust@menome.com\",EmployeeId: 12345}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime() SET employee += {nodeParams}"
     }
 
     def "process node parameters from simple message"() {
@@ -115,10 +115,9 @@ class MessageProcessorSpecification extends Specification {
         expect:
         // We should have One Office, One Project and One Team
         connectionStatements.size() == 3
-        //todo: The node suffix (0,1,2) could be associated with different nodes depending on the order they are created. They seem to be consistent but there is no guarantee
-        officeNode ==  "MERGE (node0:Card:Office {City: \"Victoria\"}) ON CREATE SET node0.Uuid = apoc.create.uuid(),node0.TheLinkAddedDate = datetime() SET node0.PendingMerge = true"
-        projectNode == "MERGE (node1:Card:Project {Code: 5}) ON CREATE SET node1.Uuid = apoc.create.uuid(),node1.TheLinkAddedDate = datetime() SET node1.PendingMerge = true"
-        teamNode == "MERGE (node2:Card:Team {Code: 1337}) ON CREATE SET node2.Uuid = apoc.create.uuid(),node2.TheLinkAddedDate = datetime() SET node2.PendingMerge = true"
+        officeNode ==  "MERGE (office:Card:Office {City: \"Victoria\"}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime() SET office.PendingMerge = true"
+        projectNode == "MERGE (project:Card:Project {Code: 5}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime() SET project.PendingMerge = true"
+        teamNode == "MERGE (team:Card:Team {Code: 1337}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime() SET team.PendingMerge = true"
         true
     }
 }

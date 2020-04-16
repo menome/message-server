@@ -19,7 +19,7 @@ class MessageProcessor {
 
     static List<String> processMerges(String msg) {
         if (msg) {
-            return processMerges(buildJSonParserfromMessage(msg), new NodeType("", NodeType.Type.PRIMARY))
+            return processMerges(buildJSonParserfromMessage(msg),NodeType.PRIMARY)
         }
     }
 
@@ -64,8 +64,10 @@ class MessageProcessor {
 
     static List<String> processMerges(Map msgMap, NodeType nodeType) {
         def mergeStatements = []
-        // Card Merge MERGE (node:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})
-        def cardMerge = "MERGE (node${nodeType.nodeSuffix}:Card:$msgMap.NodeType "
+        // Card Merge MERGE (employee:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})
+        String msgNodeType = msgMap.NodeType
+        String nodeName = msgNodeType.toLowerCase()
+        def cardMerge = "MERGE (${nodeName}:Card:$msgNodeType "
 
         def conformedDimensions = msgMap.ConformedDimensions
         if (conformedDimensions) {
@@ -82,12 +84,12 @@ class MessageProcessor {
             cardMerge += "})"
         }
 
-        cardMerge += " ON CREATE SET node${nodeType.nodeSuffix}.Uuid = apoc.create.uuid(),node${nodeType.nodeSuffix}.TheLinkAddedDate = datetime()"
+        cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
 
-        if (nodeType.nodeType == NodeType.Type.PRIMARY) {
-            cardMerge += " SET node${nodeType.nodeSuffix} += {nodeParams}"
+        if (nodeType == NodeType.PRIMARY) {
+            cardMerge += " SET ${nodeName} += {nodeParams}"
         } else {
-            cardMerge += " SET node${nodeType.nodeSuffix}.PendingMerge = true"
+            cardMerge += " SET ${nodeName}.PendingMerge = true"
         }
         mergeStatements << cardMerge
     }
@@ -96,21 +98,25 @@ class MessageProcessor {
     static List<String> processConnectedNodes(Map msgMap) {
         List<String> connectedNodeMergeStatements = []
         msgMap.Connections.eachWithIndex { Map map, Integer index ->
-            connectedNodeMergeStatements.addAll(processMerges(map, new NodeType(index as String, NodeType.Type.RELATED)))
+            connectedNodeMergeStatements.addAll(processMerges(map, NodeType.RELATED))
         }
         connectedNodeMergeStatements
     }
+
+    /*
+
+    MERGE (node0:Card:Office {City: "Victoria"})
+ON CREATE SET node0.Uuid = {node0_newUuid}, node0.PendingMerge = true
+
+
+    MERGE (node)-[node0_rel:LocatedInOffice]->(node0)
+    SET node0_rel += {node0_relProps}, node0 += {node0_nodeParams}
+     */
+
+
 }
 
-class NodeType {
-    String nodeSuffix
-    enum Type {
-        PRIMARY, RELATED
-    }
-    Type nodeType
-
-    NodeType(String nodeSuffix, NodeType.Type type) {
-        this.nodeSuffix = nodeSuffix
-        this.nodeType = type
-    }
+enum NodeType {
+    PRIMARY, RELATED
 }
+
