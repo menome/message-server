@@ -75,6 +75,14 @@ class MessageProcessorSpecification extends Specification {
         statements.size() == 3
     }
 
+    def "process message with connections"() {
+        given:
+        def processor = processMessageWithConnections()
+        List<String> statements = processor.getNeo4JStatements()
+        expect:
+        statements.size() == 9
+    }
+
     def "process indexes from simple message"() {
         given:
         def expectedCardIndex = "CREATE INDEX ON :Card(Email,EmployeeId)"
@@ -108,16 +116,30 @@ class MessageProcessorSpecification extends Specification {
     def "process connection nodes from connection message"() {
         given:
         def processor = processMessageWithConnections()
-        List<String> connectionStatements = processor.processConnectedNodes(messageWithConnections)
-        String officeNode = getStatementFromList(connectionStatements,":Office")
-        String projectNode = getStatementFromList(connectionStatements,":Project")
-        String teamNode = getStatementFromList(connectionStatements,":Team")
+        List<String> connectionStatements = processor.processConnectionNodes(messageWithConnections)
+        String officeNode = getStatementFromList(connectionStatements, ":Office")
+        String projectNode = getStatementFromList(connectionStatements, ":Project")
+        String teamNode = getStatementFromList(connectionStatements, ":Team")
         expect:
         // We should have One Office, One Project and One Team
         connectionStatements.size() == 3
-        officeNode ==  "MERGE (office:Card:Office {City: \"Victoria\"}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime() SET office.PendingMerge = true"
+        officeNode == "MERGE (office:Card:Office {City: \"Victoria\"}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime() SET office.PendingMerge = true"
         projectNode == "MERGE (project:Card:Project {Code: 5}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime() SET project.PendingMerge = true"
         teamNode == "MERGE (team:Card:Team {Code: 1337}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime() SET team.PendingMerge = true"
-        true
+    }
+
+    def "process connection relationships from connection message"() {
+        given:
+        def processor = processMessageWithConnections()
+        List<String> connectionStatements = processor.processConnectionRelationships(messageWithConnections)
+        String officeNode = getStatementFromList(connectionStatements, ":LocatedInOffice")
+        String projectNode = getStatementFromList(connectionStatements, ":WorkedOnProject")
+        String teamNode = getStatementFromList(connectionStatements, ":HAS_FACET")
+        expect:
+        // We should have One Office, One Project and One Team
+        connectionStatements.size() == 3
+        officeNode == "MERGE (employee)-[office_rel:LocatedInOffice]->(office)"
+        projectNode == "MERGE (employee)-[project_rel:WorkedOnProject]->(project)"
+        teamNode == "MERGE (employee)-[team_rel:HAS_FACET]->(team)"
     }
 }

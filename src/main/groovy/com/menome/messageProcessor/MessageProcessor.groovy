@@ -11,9 +11,12 @@ class MessageProcessor {
     static statements = []
 
     static process(String msg) {
+        statements = []
         if (msg) {
             statements.addAll(processIndexes(msg))
             statements.addAll(processMerges(msg))
+            statements.addAll(processConnectionNodes(msg))
+            statements.addAll(processConnectionRelationships(msg))
         }
     }
 
@@ -30,11 +33,16 @@ class MessageProcessor {
         }
     }
 
-    static List<String> processConnectedNodes(String msg) {
+    static List<String> processConnectionNodes(String msg) {
         if (msg) {
-            processConnectedNodes(buildJSonParserfromMessage(msg))
+            processConnectionNodes(buildJSonParserfromMessage(msg))
         }
+    }
 
+    static List<String> processConnectionRelationships(String msg) {
+        if (msg) {
+            processConnectionRelationships(buildJSonParserfromMessage(msg))
+        }
     }
 
 
@@ -95,25 +103,28 @@ class MessageProcessor {
     }
 
 
-    static List<String> processConnectedNodes(Map msgMap) {
+    static List<String> processConnectionNodes(Map msgMap) {
         List<String> connectedNodeMergeStatements = []
-        msgMap.Connections.eachWithIndex { Map map, Integer index ->
+        msgMap.Connections.each { Map map ->
             connectedNodeMergeStatements.addAll(processMerges(map, NodeType.RELATED))
         }
         connectedNodeMergeStatements
     }
 
-    /*
+    static List<String> processConnectionRelationships(Map msgMap){
+        List<String> connectionRelationshipStatements = []
+        String msgNodeType = msgMap.NodeType
+        String nodeName = msgNodeType.toLowerCase()
 
-    MERGE (node0:Card:Office {City: "Victoria"})
-ON CREATE SET node0.Uuid = {node0_newUuid}, node0.PendingMerge = true
-
-
-    MERGE (node)-[node0_rel:LocatedInOffice]->(node0)
-    SET node0_rel += {node0_relProps}, node0 += {node0_nodeParams}
-     */
-
-
+        msgMap.Connections.each { Map map ->
+            String relationshipNodeType = map.NodeType
+            String relationshipNodeName = relationshipNodeType.toLowerCase()
+            String relType = map.RelType
+            def relationshipMerge = "MERGE ($nodeName)-[${relationshipNodeName}_rel:${relType}]->($relationshipNodeName)"
+            connectionRelationshipStatements.add(relationshipMerge)
+        }
+        connectionRelationshipStatements
+    }
 }
 
 enum NodeType {
