@@ -1,5 +1,6 @@
 package com.menome.messageProcessor
 
+import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import org.apache.commons.lang3.math.NumberUtils
 import org.slf4j.Logger
@@ -22,7 +23,7 @@ class MessageProcessor {
 
     static List<String> processMerges(String msg) {
         if (msg) {
-            return processMerges(buildJSonParserfromMessage(msg),NodeType.PRIMARY)
+            return processMerges(buildJSonParserfromMessage(msg), NodeType.PRIMARY)
         }
     }
 
@@ -42,6 +43,12 @@ class MessageProcessor {
     static List<String> processConnectionRelationships(String msg) {
         if (msg) {
             processConnectionRelationships(buildJSonParserfromMessage(msg))
+        }
+    }
+
+    static String deriveNodeProperties(String msg){
+        if (msg){
+            deriveNodeProperties(buildJSonParserfromMessage((msg)))
         }
     }
 
@@ -92,13 +99,15 @@ class MessageProcessor {
             cardMerge += "})"
         }
 
+
         cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
 
         if (nodeType == NodeType.PRIMARY) {
-            cardMerge += " SET ${nodeName} += {nodeParams}"
+                cardMerge += ", ${nodeName} += {nodeParams}"
         } else {
-            cardMerge += " SET ${nodeName}.PendingMerge = true"
+            cardMerge += ", ${nodeName}.PendingMerge = true"
         }
+
         mergeStatements << cardMerge
     }
 
@@ -111,7 +120,7 @@ class MessageProcessor {
         connectedNodeMergeStatements
     }
 
-    static List<String> processConnectionRelationships(Map msgMap){
+    static List<String> processConnectionRelationships(Map msgMap) {
         List<String> connectionRelationshipStatements = []
         String msgNodeType = msgMap.NodeType
         String nodeName = msgNodeType.toLowerCase()
@@ -124,6 +133,19 @@ class MessageProcessor {
             connectionRelationshipStatements.add(relationshipMerge)
         }
         connectionRelationshipStatements
+    }
+
+    static String deriveNodeProperties(Map msgMap) {
+        String nodeProperties = null
+        Map properties = [:]
+        properties.putAll(msgMap.Properties)
+        properties.putAll(msgMap.ConformedDimensions)
+        if (properties) {
+            nodeProperties = JsonOutput.toJson(["nodeParams":properties])
+        }
+        println msgMap
+        println nodeProperties
+        return nodeProperties
     }
 }
 
