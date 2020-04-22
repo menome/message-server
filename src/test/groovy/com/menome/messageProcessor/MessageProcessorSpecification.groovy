@@ -72,7 +72,7 @@ class MessageProcessorSpecification extends Specification {
         List<String> statements = processor.getNeo4JStatements()
 
         expect:
-        statements.size() == 3
+        statements.size() == 1
     }
 
     def "process message with connections"() {
@@ -80,7 +80,7 @@ class MessageProcessorSpecification extends Specification {
         def processor = processMessageWithConnections()
         List<String> statements = processor.getNeo4JStatements()
         expect:
-        statements.size() == 9
+        statements.size() == 7
     }
 
     def "process indexes from simple message"() {
@@ -105,7 +105,7 @@ class MessageProcessorSpecification extends Specification {
         List<String> mergeStatements = processor.processMerges(simpleMessage)
         expect:
         mergeStatements.size() == 1
-        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: \"konrad.aust@menome.com\",EmployeeId: 12345}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee += {nodeParams}"
+        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: \"konrad.aust@menome.com\",EmployeeId: 12345}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Name= \"Konrad Aust\",employee.Priority= 1,employee.SourceSystem= \"HRSystem\" ON MATCH SET employee.Name= \"Konrad Aust\",employee.Priority= 1,employee.SourceSystem= \"HRSystem\""
     }
 
     def "process node parameters from simple message"() {
@@ -123,9 +123,9 @@ class MessageProcessorSpecification extends Specification {
         expect:
         // We should have One Office, One Project and One Team
         connectionStatements.size() == 3
-        officeNode == "MERGE (office:Card:Office {City: \"Victoria\"}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.PendingMerge = true"
-        projectNode == "MERGE (project:Card:Project {Code: 5}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.PendingMerge = true"
-        teamNode == "MERGE (team:Card:Team {Code: 1337}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime(), team.PendingMerge = true"
+        officeNode == "MERGE (office:Card:Office {City: \"Victoria\"}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name = \"Menome Victoria\" , office.PendingMerge = true"
+        projectNode == "MERGE (project:Card:Project {Code: 5}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.Name = \"theLink\" , project.PendingMerge = true"
+        teamNode == "MERGE (team:Card:Team {Code: 1337}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime(), team.Name = \"theLink Product Team\" , team.PendingMerge = true"
     }
 
     def "process connection relationships from connection message"() {
@@ -141,14 +141,5 @@ class MessageProcessorSpecification extends Specification {
         officeNode == "MERGE (employee)-[office_rel:LocatedInOffice]->(office)"
         projectNode == "MERGE (employee)-[project_rel:WorkedOnProject]->(project)"
         teamNode == "MERGE (employee)-[team_rel:HAS_FACET]->(team)"
-    }
-
-    def "derive node parameters"(){
-        given:
-        def processor = processMessageWithConnections()
-        String parms = processor.deriveNodeProperties(messageWithConnections)
-        expect:
-        parms == "{\"nodeParams\":{\"Status\":\"active\",\"PreferredName\":\"The Chazzinator\",\"ResumeSkills\":\"programming,peeling bananas from the wrong end,handstands,sweet kickflips\",\"Email\":\"konrad.aust@menome.com\",\"EmployeeId\":12345}}"
-
     }
 }

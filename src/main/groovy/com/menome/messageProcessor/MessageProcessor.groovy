@@ -1,6 +1,6 @@
 package com.menome.messageProcessor
 
-import groovy.json.JsonOutput
+
 import groovy.json.JsonSlurper
 import org.apache.commons.lang3.math.NumberUtils
 import org.slf4j.Logger
@@ -14,7 +14,7 @@ class MessageProcessor {
     static process(String msg) {
         statements = []
         if (msg) {
-            statements.addAll(processIndexes(msg))
+            //statements.addAll(processIndexes(msg))
             statements.addAll(processMerges(msg))
             statements.addAll(processConnectionNodes(msg))
             statements.addAll(processConnectionRelationships(msg))
@@ -45,13 +45,6 @@ class MessageProcessor {
             processConnectionRelationships(buildJSonParserfromMessage(msg))
         }
     }
-
-    static String deriveNodeProperties(String msg){
-        if (msg){
-            deriveNodeProperties(buildJSonParserfromMessage((msg)))
-        }
-    }
-
 
     private static Map buildJSonParserfromMessage(String msg) {
         def parser = new JsonSlurper()
@@ -86,31 +79,42 @@ class MessageProcessor {
 
         def conformedDimensions = msgMap.ConformedDimensions
         if (conformedDimensions) {
-            cardMerge += "{"
-            conformedDimensions.eachWithIndex { key, value, index ->
-                boolean valueIsNumeric = NumberUtils.isCreatable(value as String)
-                String valueDelimiter = ""
-                if (!valueIsNumeric) {
-                    valueDelimiter = "\""
-                }
-
-                cardMerge += "$key: $valueDelimiter$value$valueDelimiter" + (index < conformedDimensions.size() - 1 ? "," : "")
-            }
-            cardMerge += "})"
+            cardMerge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
         }
-
 
         cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
 
         if (nodeType == NodeType.PRIMARY) {
-                cardMerge += ", ${nodeName} += {nodeParams}"
-        } else {
-            cardMerge += ", ${nodeName}.PendingMerge = true"
-        }
+            Map keysToProcess = [:]
+            keysToProcess.putAll(msgMap)
+            keysToProcess.putAll(msgMap.Properties ?: [:])
+            keysToProcess.remove("ConformedDimensions")
+            keysToProcess.remove("Connections")
+            keysToProcess.remove("NodeType")
+            keysToProcess.remove("Properties")
+            cardMerge += ", "
+            def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+            cardMerge += mergeExpression
+            cardMerge += " ON MATCH SET " + mergeExpression
 
+        } else {
+            cardMerge += ", ${nodeName}.Name = \"${msgMap.Name}\" , ${nodeName}.PendingMerge = true"
+        }
         mergeStatements << cardMerge
     }
 
+    private static String buildMergeExpressionFromMap(msgMap, valuePrefix, keySeparator) {
+        String expression = ""
+        msgMap.eachWithIndex { key, value, index ->
+            boolean valueIsNumeric = NumberUtils.isCreatable(value as String)
+            String valueDelimiter = ""
+            if (!valueIsNumeric) {
+                valueDelimiter = "\""
+            }
+            expression += "$valuePrefix$key$keySeparator $valueDelimiter$value$valueDelimiter" + (index < msgMap.size() - 1 ? "," : "")
+        }
+        expression
+    }
 
     static List<String> processConnectionNodes(Map msgMap) {
         List<String> connectedNodeMergeStatements = []
@@ -133,19 +137,6 @@ class MessageProcessor {
             connectionRelationshipStatements.add(relationshipMerge)
         }
         connectionRelationshipStatements
-    }
-
-    static String deriveNodeProperties(Map msgMap) {
-        String nodeProperties = null
-        Map properties = [:]
-        properties.putAll(msgMap.Properties)
-        properties.putAll(msgMap.ConformedDimensions)
-        if (properties) {
-            nodeProperties = JsonOutput.toJson(["nodeParams":properties])
-        }
-        println msgMap
-        println nodeProperties
-        return nodeProperties
     }
 }
 
