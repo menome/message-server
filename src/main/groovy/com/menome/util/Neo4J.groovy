@@ -35,4 +35,17 @@ class Neo4J {
     }
 
 
+    static executeStatementListInSession(List<String> statements, Session session) {
+        String statement = ""
+        statements.each() {
+            statement += it + " \n"
+        }
+        session.writeTransaction(new TransactionWork() {
+            @Override
+            execute(Transaction tx) {
+                tx.run(statement)
+            }
+        })
+    }
+
 }

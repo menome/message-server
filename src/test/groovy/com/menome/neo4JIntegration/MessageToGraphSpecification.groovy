@@ -5,33 +5,30 @@ import com.menome.messageBuilder.MessageBuilder
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.util.Neo4J
 import org.neo4j.driver.Driver
+import org.neo4j.driver.Result
 import org.neo4j.driver.Session
-import org.neo4j.driver.Transaction
-import org.neo4j.driver.TransactionWork
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.Network
-import org.testcontainers.containers.wait.strategy.Wait
+import spock.lang.Shared
 import spock.lang.Specification
 
+import java.text.SimpleDateFormat
 import java.time.Duration
 
 class MessageToGraphSpecification extends Specification {
+
+    @Shared
+    GenericContainer neo4JContainer
+
+    @Shared
+    Driver neo4JDriver
 
     static final int NEO4J_BOLT_API_PORT = 7687
     static final int NEO4J_WEB_PORT = 7474
 
     static Logger log = LoggerFactory.getLogger(MessageToGraphSpecification.class)
-
-    static String simpleMessage = MessageBuilder.builder()
-            .Name("Konrad Aust")
-            .NodeType("Employee")
-            .Priority(1)
-            .SourceSystem("HRSystem")
-            .ConformedDimensions("Email": "konrad.aust@menome.com", "EmployeeId": 12345)
-            .build()
-            .toJSON()
 
     static office = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
     static project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
@@ -48,6 +45,18 @@ class MessageToGraphSpecification extends Specification {
             .build()
             .toJSON()
 
+
+    Result run(String statement){
+        Neo4J.run(neo4JDriver, statement,[:])
+    }
+
+    def assertOneResultWithATrueValue(String matchExpression) {
+        Driver driver = Neo4J.openDriver(neo4JContainer)
+        Result result = run(matchExpression)
+        def resultMap = result.single().asMap()
+        resultMap.size() == 1
+        resultMap.values()[0] == true
+    }
 
 
     protected static GenericContainer createAndStartNeo4JContainer(Network network) {
@@ -69,50 +78,32 @@ class MessageToGraphSpecification extends Specification {
         return neo4JContainer
     }
 
-    /*
+    def setup(){
+        run("MATCH (n) DETATCH DELETE n")
+    }
 
-    https://neo4j.com/docs/driver-manual/current/session-api/simple/
+    def setupSpec(){
+        neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork())
+        neo4JDriver =  Neo4J.openDriver(neo4JContainer)
+    }
 
-               {
-                    tx.run( "MATCH (emp:Person {name: $person_name}) " +
-                            "MERGE (com:Company {name: $company_name}) " +
-                            "MERGE (emp)-[:WORKS_FOR]->(com)",
-                            parameters( "person_name", person.get( "name" ).asString(), "company_name",
-                                    companyName ) );
-                    return 1;
-
-     */
+    def cleanupSpec(){
+        neo4JDriver.close()
+    }
 
     def "create graph from simple message"() {
         given:
-        def neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork())
-        Driver driver = Neo4J.openDriver(neo4JContainer)
-        Session session = driver.session()
         MessageProcessor processor = new MessageProcessor()
+        Session session = neo4JDriver.session()
         when:
 
         processor.process(messageWithConnections)
         List<String> statements = processor.getNeo4JStatements()
-        String statement = ""
-        statements.each() {
-            statement += it + " \n"
-        }
-
-        println "$statement"
-        session.writeTransaction(new TransactionWork() {
-            @Override
-            execute(Transaction tx) {
-                tx.run(statement)
-            }
-        })
+        Neo4J.executeStatementListInSession(statements, session)
         session.close()
 
         then:
-        println "Pausing ...."
-        sleep(10000000)
-        //todo: Fetch bits from the graph
-
-        1 == 1
-
+        assertOneResultWithATrueValue("MATCH (n) RETURN COUNT(n)=4")
     }
+
 }
