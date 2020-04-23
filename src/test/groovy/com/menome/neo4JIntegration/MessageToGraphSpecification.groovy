@@ -14,7 +14,6 @@ import org.testcontainers.containers.Network
 import spock.lang.Shared
 import spock.lang.Specification
 
-import java.text.SimpleDateFormat
 import java.time.Duration
 
 class MessageToGraphSpecification extends Specification {
@@ -51,7 +50,6 @@ class MessageToGraphSpecification extends Specification {
     }
 
     def assertOneResultWithATrueValue(String matchExpression) {
-        Driver driver = Neo4J.openDriver(neo4JContainer)
         Result result = run(matchExpression)
         def resultMap = result.single().asMap()
         resultMap.size() == 1
@@ -91,7 +89,7 @@ class MessageToGraphSpecification extends Specification {
         neo4JDriver.close()
     }
 
-    def "create graph from simple message"() {
+    def "create graph from message with relationships"() {
         given:
         MessageProcessor processor = new MessageProcessor()
         Session session = neo4JDriver.session()
@@ -103,7 +101,28 @@ class MessageToGraphSpecification extends Specification {
         session.close()
 
         then:
-        assertOneResultWithATrueValue("MATCH (n) RETURN COUNT(n)=4")
+        assertOneResultWithATrueValue("MATCH (n) RETURN COUNT(n) =                 4")
+        assertOneResultWithATrueValue("Match(employee:Employee:Card) return employee.Name = \"Konrad Aust\"")
+        Map employeeInOfficeResult = run("Match(employee:Employee)-[:LocatedInOffice]-(office:Office) return employee.Name,office.Name").single().asMap()
+        employeeInOfficeResult."employee.Name"  == "Konrad Aust"
+        employeeInOfficeResult."office.Name"  == "Menome Victoria"
+
+        Map employeeOnProjectResult = run("Match(employee:Employee)-[:WorkedOnProject]-(project:Project) return employee.Name ,project.Name").single().asMap()
+        employeeOnProjectResult."employee.Name"  == "Konrad Aust"
+        employeeOnProjectResult."project.Name"  == "theLink"
+
+        Map attributesOnEmployeeNode = run("Match (employee:Employee) return employee.Email,employee.EmployeeId,employee.Name,employee.PreferredName,employee.Priority,employee.ResumeSkills,employee.SourceSystem,employee.Status,employee.TheLinkAddedDate,employee.Uuid").single().asMap()
+        attributesOnEmployeeNode."employee.Email"  == "konrad.aust@menome.com"
+        attributesOnEmployeeNode."employee.EmployeeId"  == 12345
+        attributesOnEmployeeNode."employee.Name"  == "Konrad Aust"
+        attributesOnEmployeeNode."employee.PreferredName" == "The Chazzinator"
+        attributesOnEmployeeNode."employee.Priority" == 1
+        attributesOnEmployeeNode."employee.ResumeSkills" == "programming,peeling bananas from the wrong end,handstands,sweet kickflips"
+        attributesOnEmployeeNode."employee.SourceSystem" == "HRSystem"
+        attributesOnEmployeeNode."employee.Status" == "active"
+        attributesOnEmployeeNode."employee.TheLinkAddedDate" != null
+        attributesOnEmployeeNode."employee.Uuid" != null
     }
+
 
 }
