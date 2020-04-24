@@ -1,35 +1,8 @@
 package com.menome.messageProcessor
 
-import com.menome.messageBuilder.Connection
-import com.menome.messageBuilder.MessageBuilder
-import spock.lang.Specification
+import com.menome.MessagingSpecification
 
-class MessageProcessorSpecification extends Specification {
-
-    static String simpleMessage = MessageBuilder.builder()
-            .Name("Konrad Aust")
-            .NodeType("Employee")
-            .Priority(1)
-            .SourceSystem("HRSystem")
-            .ConformedDimensions("Email": "konrad.aust@menome.com", "EmployeeId": 12345)
-            .build()
-            .toJSON()
-
-    static office = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
-    static project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
-    static team = Connection.builder().Name("theLink Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
-
-    static String messageWithConnections = MessageBuilder.builder()
-            .Name("Konrad Aust")
-            .NodeType("Employee")
-            .Priority(1)
-            .SourceSystem("HRSystem")
-            .ConformedDimensions("Email": "konrad.aust@menome.com", "EmployeeId": 12345)
-            .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
-            .Connections([office, project, team])
-            .build()
-            .toJSON()
-
+class MessageProcessorSpecification extends MessagingSpecification {
 
     MessageProcessor processMessage(String message) {
         MessageProcessor processor = new MessageProcessor()

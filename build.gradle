@@ -22,6 +22,9 @@ dependencies {
     compile group: 'org.neo4j', name: 'neo4j', version: '4.0.3'
     compile 'org.neo4j.driver:neo4j-java-driver:4.0.1'
 
+    compile 'org.awaitility:awaitility-groovy:4.0.2'
+    compile group: 'io.micrometer', name: 'micrometer-core', version: '1.4.1'
+
     compile "org.testcontainers:rabbitmq:1.12.3"
     compile "org.testcontainers:spock:1.12.3"
     //compile "org.testcontainers:neo4j:1.12.3"
