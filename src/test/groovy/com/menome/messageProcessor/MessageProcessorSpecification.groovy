@@ -1,20 +1,20 @@
 package com.menome.messageProcessor
 
 import com.menome.MessagingSpecification
+import scala.collection.script.Message
 
 class MessageProcessorSpecification extends MessagingSpecification {
 
-    MessageProcessor processMessage(String message) {
+    List<String> processMessage(String message) {
         MessageProcessor processor = new MessageProcessor()
-        processor.process(message)
-        return processor
+        return processor.process(message)
     }
 
-    MessageProcessor processSimpleMessage() {
+    List<String> processSimpleMessage() {
         return processMessage(simpleMessage)
     }
 
-    MessageProcessor processMessageWithConnections() {
+    List<String> processMessageWithConnections() {
         return processMessage(messageWithConnections)
     }
 
@@ -33,16 +33,15 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         def msg = ""
         MessageProcessor processor = new MessageProcessor()
-        processor.process(msg)
+        List<String> statements = processor.process(msg)
         expect:
-        processor.getNeo4JStatements().isEmpty()
+        statements.isEmpty()
     }
 
 
     def "process simple valid message"() {
         given:
-        def processor = processSimpleMessage()
-        List<String> statements = processor.getNeo4JStatements()
+        List<String> statements =  processSimpleMessage()
 
         expect:
         statements.size() == 1
@@ -50,8 +49,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process message with connections"() {
         given:
-        def processor = processMessageWithConnections()
-        List<String> statements = processor.getNeo4JStatements()
+        List<String> statements = processMessageWithConnections()
         expect:
         statements.size() == 7
     }
@@ -61,7 +59,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         def expectedCardIndex = "CREATE INDEX ON :Card(Email,EmployeeId)"
         def expectedEmployeeIndex = "CREATE INDEX ON :Employee(Email,EmployeeId)"
         def processor = processSimpleMessage()
-        List<String> indexStatements = processor.processIndexes(simpleMessage)
+        List<String> indexStatements = MessageProcessor.processIndexes(simpleMessage)
 
         expect:
         indexStatements.size() == 2
@@ -74,8 +72,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process merge from simple message"() {
         given:
-        def processor = processSimpleMessage()
-        List<String> mergeStatements = processor.processMerges(simpleMessage)
+        List<String> mergeStatements = MessageProcessor.processMerges(simpleMessage)
         expect:
         mergeStatements.size() == 1
         mergeStatements[0] == "MERGE (employee:Card:Employee {Email: \"konrad.aust@menome.com\",EmployeeId: 12345}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Name= \"Konrad Aust\",employee.Priority= 1,employee.SourceSystem= \"HRSystem\" ON MATCH SET employee.Name= \"Konrad Aust\",employee.Priority= 1,employee.SourceSystem= \"HRSystem\""
@@ -88,8 +85,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process connection nodes from connection message"() {
         given:
-        def processor = processMessageWithConnections()
-        List<String> connectionStatements = processor.processConnectionNodes(messageWithConnections)
+        List<String> connectionStatements = MessageProcessor.processConnectionNodes(messageWithConnections)
         String officeNode = getStatementFromList(connectionStatements, ":Office")
         String projectNode = getStatementFromList(connectionStatements, ":Project")
         String teamNode = getStatementFromList(connectionStatements, ":Team")
@@ -103,8 +99,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process connection relationships from connection message"() {
         given:
-        def processor = processMessageWithConnections()
-        List<String> connectionStatements = processor.processConnectionRelationships(messageWithConnections)
+        List<String> connectionStatements = MessageProcessor.processConnectionRelationships(messageWithConnections)
         String officeNode = getStatementFromList(connectionStatements, ":LocatedInOffice")
         String projectNode = getStatementFromList(connectionStatements, ":WorkedOnProject")
         String teamNode = getStatementFromList(connectionStatements, ":HAS_FACET")

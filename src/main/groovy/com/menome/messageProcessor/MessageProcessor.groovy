@@ -9,16 +9,16 @@ import org.slf4j.LoggerFactory
 class MessageProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageProcessor.class)
-    static statements = []
 
-    static process(String msg) {
-        statements = []
+    static List<String> process(String msg) {
+        List<String> statements = []
         if (msg) {
             //statements.addAll(processIndexes(msg))
             statements.addAll(processMerges(msg))
             statements.addAll(processConnectionNodes(msg))
             statements.addAll(processConnectionRelationships(msg))
         }
+         statements
     }
 
     static List<String> processMerges(String msg) {
@@ -50,10 +50,6 @@ class MessageProcessor {
         def parser = new JsonSlurper()
         def msgMap = parser.parseText(msg) as Map
         msgMap
-    }
-
-    static List<String> getNeo4JStatements() {
-        statements
     }
 
     static List<String> processIndexes(Map msgMap) {

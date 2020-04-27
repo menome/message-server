@@ -41,7 +41,7 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
     Driver neo4JDriver
 
 
-    protected static ConnectionFactory createRabbitConnectionFactory(GenericContainer rabbitMQContainer){
+    protected static ConnectionFactory createRabbitConnectionFactory(GenericContainer rabbitMQContainer) {
         ConnectionFactory rabbitConnectionFactory = new ConnectionFactory()
         rabbitConnectionFactory.host = rabbitMQContainer.containerIpAddress
         rabbitConnectionFactory.port = rabbitMQContainer.getMappedPort(RABBITMQ_PORT)
@@ -51,7 +51,7 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         return rabbitConnectionFactory
     }
 
-    protected static ConnectionFactory createRabbitConnectionFactory(){
+    protected static ConnectionFactory createRabbitConnectionFactory() {
         ConnectionFactory rabbitConnectionFactory = new ConnectionFactory()
         rabbitConnectionFactory.host = "127.0.0.1"
         rabbitConnectionFactory.port = RABBITMQ_PORT
@@ -72,26 +72,44 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         return rabbitChannel
     }
 
-    def setupSpec(){
+    def xsetupSpec() {
         //rabbitMQContainer = createAndStartRabbitMQContainer(Network.newNetwork())
         rabbitConnectionFactory = createRabbitConnectionFactory()
         metrics = new MicrometerMetricsCollector(new SimpleMeterRegistry())
         rabbitConnectionFactory.setMetricsCollector(metrics)
         neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork())
-        neo4JDriver =  Neo4J.openDriver(neo4JContainer)
+        neo4JDriver = Neo4J.openDriver(neo4JContainer)
+    }
+
+    def "write for server"() {
+        given:
+        rabbitConnectionFactory = createRabbitConnectionFactory()
+        metrics = new MicrometerMetricsCollector(new SimpleMeterRegistry())
+        rabbitConnectionFactory.setMetricsCollector(metrics)
+
+        def rabbitChannel = openRabbitMQChanel(null, RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY)
+        when:
+        (1..5000).each { it ->
+            String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
+            println "Publishing:$message"
+            rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
+        }
+        await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == 5000 }
+        then:
+        1 == 1
     }
 
     def "write 5000 messages to rabbit"() {
         given:
         def rabbitChannel = openRabbitMQChanel(rabbitMQContainer, RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY)
         when:
-        (1..5000).each { it->
-            String message = messageWithConnections.replaceAll("konrad.aust@menome.com","konrad.aust$it@menome.com")
+        (1..5000).each { it ->
+            String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
             rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
         }
         await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == 5000 }
         then:
-        println(new SimpleDateFormat("yyyy/MM/dd HH:mm:SSSSS").format(new Date()) )
+        println(new SimpleDateFormat("yyyy/MM/dd HH:mm:SSSSS").format(new Date()))
         Instant start = Instant.now()
         rabbitChannel.basicConsume(RABBITMQ_QUEUE_NAME, new DefaultConsumer(rabbitChannel) {
             @Override
@@ -111,7 +129,7 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         })
         await().atMost(5, TimeUnit.MINUTES).until { metrics.consumedMessages.count() >= 5000 }
         Instant end = Instant.now()
-        Duration duration = Duration.between(start,end)
+        Duration duration = Duration.between(start, end)
         println(duration)
         println "Done..."
         //sleep(100000)
