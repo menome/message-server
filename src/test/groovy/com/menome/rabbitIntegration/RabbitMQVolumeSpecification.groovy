@@ -72,7 +72,7 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         return rabbitChannel
     }
 
-    def xsetupSpec() {
+    def setupSpec() {
         //rabbitMQContainer = createAndStartRabbitMQContainer(Network.newNetwork())
         rabbitConnectionFactory = createRabbitConnectionFactory()
         metrics = new MicrometerMetricsCollector(new SimpleMeterRegistry())
@@ -103,11 +103,23 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         given:
         def rabbitChannel = openRabbitMQChanel(rabbitMQContainer, RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY)
         when:
-        (1..5000).each { it ->
+
+
+        Neo4J.run(neo4JDriver, "CREATE INDEX ON :Employee(Email,EmployeeId)")
+        Neo4J.run(neo4JDriver, "CREATE INDEX ON :Card(Email,EmployeeId)")
+        Neo4J.run(neo4JDriver, "MERGE (team:Card:Team {Code: 1337}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime(), team.Name = \"theLink Product Team\" , team.PendingMerge = true")
+        Neo4J.run(neo4JDriver, "MERGE (project:Card:Project {Code: 5}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.Name = \"theLink\" , project.PendingMerge = true")
+        Neo4J.run(neo4JDriver, "MERGE (office:Card:Office {City: \"Victoria\"}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name = \"Menome Victoria\" , office.PendingMerge = true")
+
+        //(1..5000).each { it ->
+        int messagesToCreate = 50
+        println("Creating $messagesToCreate")
+        (1..messagesToCreate).each { it ->
             String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
             rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
         }
-        await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == 5000 }
+
+        await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() >= messagesToCreate }
         then:
         println(new SimpleDateFormat("yyyy/MM/dd HH:mm:SSSSS").format(new Date()))
         Instant start = Instant.now()
@@ -117,21 +129,17 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
                 long deliveryTag = envelope.getDeliveryTag()
                 MessageProcessor processor = new MessageProcessor()
                 Session session = neo4JDriver.session()
-
-                processor.process(new String(body))
-                //println new String(body)
-                List<String> statements = processor.getNeo4JStatements()
+                List<String> statements = processor.process(new String(body))
                 Neo4J.executeStatementListInSession(statements, session)
                 session.close()
-
                 rabbitChannel.basicAck(deliveryTag, false)
             }
         })
-        await().atMost(5, TimeUnit.MINUTES).until { metrics.consumedMessages.count() >= 5000 }
+        await().atMost(5, TimeUnit.MINUTES).until { metrics.consumedMessages.count() >= 50 }
         Instant end = Instant.now()
         Duration duration = Duration.between(start, end)
         println(duration)
         println "Done..."
-        //sleep(100000)
+        sleep(1000000000)
     }
 }

@@ -1,6 +1,5 @@
 package com.menome.messageProcessor
 
-
 import groovy.json.JsonSlurper
 import org.apache.commons.lang3.math.NumberUtils
 import org.slf4j.Logger
@@ -73,28 +72,37 @@ class MessageProcessor {
         String nodeName = msgNodeType.toLowerCase()
         def cardMerge = "MERGE (${nodeName}:Card:$msgNodeType "
 
-        def conformedDimensions = msgMap.ConformedDimensions
-        if (conformedDimensions) {
+        if(nodeType == NodeType.RELATED){
+            def conformedDimensions = msgMap.ConformedDimensions
+            cardMerge = "MATCH (${nodeName}:$msgNodeType "
             cardMerge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
+            cardMerge += " RETURN ${nodeName}"
         }
 
-        cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
-
         if (nodeType == NodeType.PRIMARY) {
-            Map keysToProcess = [:]
-            keysToProcess.putAll(msgMap)
-            keysToProcess.putAll(msgMap.Properties ?: [:])
-            keysToProcess.remove("ConformedDimensions")
-            keysToProcess.remove("Connections")
-            keysToProcess.remove("NodeType")
-            keysToProcess.remove("Properties")
-            cardMerge += ", "
-            def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
-            cardMerge += mergeExpression
-            cardMerge += " ON MATCH SET " + mergeExpression
+            def conformedDimensions = msgMap.ConformedDimensions
+            if (conformedDimensions) {
+                cardMerge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
+            }
 
-        } else {
-            cardMerge += ", ${nodeName}.Name = \"${msgMap.Name}\" , ${nodeName}.PendingMerge = true"
+            cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
+
+            if (nodeType == NodeType.PRIMARY) {
+                Map keysToProcess = [:]
+                keysToProcess.putAll(msgMap)
+                keysToProcess.putAll(msgMap.Properties ?: [:])
+                keysToProcess.remove("ConformedDimensions")
+                keysToProcess.remove("Connections")
+                keysToProcess.remove("NodeType")
+                keysToProcess.remove("Properties")
+                cardMerge += ", "
+                def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+                cardMerge += mergeExpression
+                cardMerge += " ON MATCH SET " + mergeExpression
+
+            } else {
+                cardMerge += ", ${nodeName}.Name = \"${msgMap.Name}\" , ${nodeName}.PendingMerge = true"
+            }
         }
         mergeStatements << cardMerge
     }

@@ -2,7 +2,6 @@ package com.menome
 
 import com.menome.messageBuilder.Connection
 import com.menome.messageBuilder.MessageBuilder
-import com.menome.neo4JIntegration.MessageToGraphSpecification
 import com.menome.rabbitIntegration.RabbitMQVolumeSpecification
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -64,8 +63,8 @@ class MessagingSpecification extends Specification{
 
         neo4JContainer.start()
 
-        MessageToGraphSpecification.log.info "Neo4J - Bolt bolt://localhost:${neo4JContainer.getMappedPort(NEO4J_BOLT_API_PORT)}"
-        log.info "Neo4J - Web http://localhost:${neo4JContainer.getMappedPort(NEO4J_WEB_PORT)}"
+        println "Neo4J - Bolt bolt://localhost:${neo4JContainer.getMappedPort(NEO4J_BOLT_API_PORT)}"
+        println "Neo4J - Web http://localhost:${neo4JContainer.getMappedPort(NEO4J_WEB_PORT)}"
 
         return neo4JContainer
     }
