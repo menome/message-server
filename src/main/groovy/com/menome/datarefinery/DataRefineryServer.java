@@ -9,15 +9,16 @@ import org.neo4j.driver.Session;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import reactor.core.Disposable;
-import reactor.core.scheduler.Schedulers;
 import reactor.rabbitmq.RabbitFlux;
 import reactor.rabbitmq.Receiver;
 import reactor.rabbitmq.ReceiverOptions;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
-
-import static java.lang.Thread.sleep;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class DataRefineryServer {
 
@@ -39,21 +40,27 @@ public class DataRefineryServer {
         ReceiverOptions receiverOptions = new ReceiverOptions()
                 .connectionFactory(rabbitConnectionFactory)
                 .connectionSupplier(cf -> cf.newConnection(new Address[]{new Address("127.0.0.1")}, RABBITMQ_QUEUE_NAME))
-                .connectionSubscriptionScheduler(Schedulers.elastic());
+                ;
 
         Driver driver = Neo4J.openDriver(neo4JContainer);
 
-        Receiver rabbitReceiver = RabbitFlux.createReceiver(receiverOptions);
-        consume(rabbitReceiver,driver);
-
+        ExecutorService executor = Executors.newFixedThreadPool(10);
         try {
-            System.out.println("Waiting....");
-            sleep(10000000);
+            executor.awaitTermination(20l, TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
+        Receiver rabbitReceiver = RabbitFlux.createReceiver(receiverOptions);
+        consume(executor, rabbitReceiver, driver);
+
+        /*
+        Todo: Need some way to shutdown the executor service. Message on a queue?
+        executor.shutdown();
+        executor.shutdownNow();
+         */
     }
+
 
     private static ConnectionFactory createRabbitConnectionFactory() {
         ConnectionFactory rabbitConnectionFactory = new ConnectionFactory();
@@ -65,7 +72,7 @@ public class DataRefineryServer {
         return rabbitConnectionFactory;
     }
 
-    protected static GenericContainer createAndStartNeo4JContainer(Network network) {
+    private static GenericContainer createAndStartNeo4JContainer(Network network) {
         GenericContainer neo4JContainer = new GenericContainer("neo4j:4.0.3")
                 .withNetwork(network)
                 .withNetworkAliases("neo4j")
@@ -78,24 +85,43 @@ public class DataRefineryServer {
 
         neo4JContainer.start();
 
-        System.out.println( "Neo4J - Bolt bolt://localhost:" + neo4JContainer.getMappedPort(NEO4J_BOLT_API_PORT));
-        System.out.println( "Neo4J - Web http://localhost:" + neo4JContainer.getMappedPort(NEO4J_WEB_PORT));
+        System.out.println("Neo4J - Bolt bolt://localhost:" + neo4JContainer.getMappedPort(NEO4J_BOLT_API_PORT));
+        System.out.println("Neo4J - Web http://localhost:" + neo4JContainer.getMappedPort(NEO4J_WEB_PORT));
 
         return neo4JContainer;
     }
 
 
-
-    private static Disposable consume(Receiver rabbitReceiver,Driver driver) {
+    private static Disposable consume(ExecutorService executor, Receiver rabbitReceiver, Driver driver) {
         return rabbitReceiver.consumeAutoAck(RABBITMQ_QUEUE_NAME)
                 .subscribe(m -> {
                     byte[] body = m.getBody();
                     String msg = new String(body);
-                    System.out.println(Thread.currentThread().getName() + " " + msg);
-                    List<String> statements = MessageProcessor.process(msg);
-                    Session session = driver.session();
-                    Neo4J.executeStatementListInSession(statements, session);
-                    session.close();
+                    Task task = new Task(driver,msg);
+                    executor.submit(task);
                 });
+    }
+
+    static class Task implements Runnable {
+
+        private final Driver driver;
+        private final String message;
+
+        public Task(Driver driver,String message) {
+            this.driver = driver;
+            this.message = message;
+        }
+
+        @Override
+        public void run() {
+            //System.out.println(Thread.currentThread().getName() + " " + message);
+            if (message.contains("t1@") || message.contains("t5000@")){
+                System.out.println("Time:" + Instant.now());
+            }
+            List<String> statements = MessageProcessor.process(message);
+            Session session = driver.session();
+            Neo4J.executeStatementListInSession(statements, session);
+            session.close();
+        }
     }
 }
