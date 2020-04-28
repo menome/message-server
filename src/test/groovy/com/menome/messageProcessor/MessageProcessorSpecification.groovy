@@ -1,7 +1,6 @@
 package com.menome.messageProcessor
 
 import com.menome.MessagingSpecification
-import scala.collection.script.Message
 
 class MessageProcessorSpecification extends MessagingSpecification {
 
