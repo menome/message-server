@@ -43,7 +43,11 @@ class Neo4J {
         session.writeTransaction(new TransactionWork() {
             @Override
             execute(Transaction tx) {
-                tx.run(statement)
+                try {
+                    tx.run(statement)
+                } catch(Throwable ex){
+                    println ex
+                }
             }
         })
     }

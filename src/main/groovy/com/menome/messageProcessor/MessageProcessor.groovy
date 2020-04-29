@@ -65,6 +65,16 @@ class MessageProcessor {
         indexStatements
     }
 
+    /*
+    MERGE (employee:Card:Employee {Email: "konrad.aust2@menome.com",EmployeeId: 12345}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Name= "Konrad Aust",employee.Priority= 1,employee.SourceSystem= "HRSystem",employee.Status= "active",employee.PreferredName= "The Chazzinator",employee.ResumeSkills= "programming,peeling bananas from the wrong end,handstands,sweet kickflips" ON MATCH SET employee.Name= "Konrad Aust",employee.Priority= 1,employee.SourceSystem= "HRSystem",employee.Status= "active",employee.PreferredName= "The Chazzinator",employee.ResumeSkills= "programming,peeling bananas from the wrong end,handstands,sweet kickflips" with employee
+    MATCH (office:Office {City: "Victoria"}) WITH employee,office
+    MATCH (project:Project {Code: 5}) WITH employee,office,project
+    MATCH (team:Team {Code: 1337}) WITH employee,office,project,team
+    MERGE (employee)-[office_rel:LocatedInOffice]->(office)
+    MERGE (employee)-[project_rel:WorkedOnProject]->(project)
+    MERGE (employee)-[team_rel:HAS_FACET]->(team)
+     */
+
     static List<String> processMerges(Map msgMap, NodeType nodeType) {
         def mergeStatements = []
         // Card Merge MERGE (employee:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})
@@ -76,7 +86,7 @@ class MessageProcessor {
             def conformedDimensions = msgMap.ConformedDimensions
             cardMerge = "MATCH (${nodeName}:$msgNodeType "
             cardMerge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
-            cardMerge += " RETURN ${nodeName}"
+            cardMerge += " WITH ${nodeName} "
         }
 
         if (nodeType == NodeType.PRIMARY) {
@@ -99,6 +109,7 @@ class MessageProcessor {
                 def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
                 cardMerge += mergeExpression
                 cardMerge += " ON MATCH SET " + mergeExpression
+                cardMerge += " WITH ${nodeName}"
 
             } else {
                 cardMerge += ", ${nodeName}.Name = \"${msgMap.Name}\" , ${nodeName}.PendingMerge = true"

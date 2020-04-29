@@ -35,6 +35,7 @@ public class DataRefineryServer {
 
         GenericContainer neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork());
 
+
         ConnectionFactory rabbitConnectionFactory = createRabbitConnectionFactory();
 
         ReceiverOptions receiverOptions = new ReceiverOptions()
@@ -43,6 +44,12 @@ public class DataRefineryServer {
                 ;
 
         Driver driver = Neo4J.openDriver(neo4JContainer);
+        Neo4J.run(driver, "CREATE INDEX ON :Employee(Email,EmployeeId)");
+        Neo4J.run(driver, "CREATE INDEX ON :Card(Email,EmployeeId)");
+        Neo4J.run(driver, "MERGE (team:Card:Team {Code: 1337}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime(), team.Name = \"theLink Product Team\" , team.PendingMerge = true");
+        Neo4J.run(driver, "MERGE (project:Card:Project {Code: 5}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.Name = \"theLink\" , project.PendingMerge = true");
+        Neo4J.run(driver, "MERGE (office:Card:Office {City: \"Victoria\"}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name = \"Menome Victoria\" , office.PendingMerge = true");
+
 
         ExecutorService executor = Executors.newFixedThreadPool(10);
         try {
@@ -120,6 +127,7 @@ public class DataRefineryServer {
             }
             List<String> statements = MessageProcessor.process(message);
             Session session = driver.session();
+            System.out.println("statements = " + statements);
             Neo4J.executeStatementListInSession(statements, session);
             session.close();
         }

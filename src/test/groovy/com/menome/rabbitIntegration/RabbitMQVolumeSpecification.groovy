@@ -88,13 +88,14 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         rabbitConnectionFactory.setMetricsCollector(metrics)
 
         def rabbitChannel = openRabbitMQChanel(null, RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY)
+        def messagesToWrite = 50
         when:
-        (1..5000).each { it ->
+        (1..messagesToWrite).each { it ->
             String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
             println "Publishing:$message"
             rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
         }
-        await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == 5000 }
+        await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == messagesToWrite }
         then:
         1 == 1
     }
