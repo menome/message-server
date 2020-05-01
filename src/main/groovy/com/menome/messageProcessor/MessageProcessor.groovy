@@ -1,7 +1,7 @@
 package com.menome.messageProcessor
 
+import com.google.gson.Gson
 import groovy.json.JsonSlurper
-import org.apache.commons.lang3.math.NumberUtils
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -17,12 +17,19 @@ class MessageProcessor {
             statements.addAll(processConnectionNodes(msg))
             statements.addAll(processConnectionRelationships(msg))
         }
-         statements
+        statements
     }
 
     static List<String> processMerges(String msg) {
         if (msg) {
-            return processMerges(buildJSonParserfromMessage(msg), NodeType.PRIMARY)
+            return processMerges(buildJSonParserfromMessage(msg))
+        }
+    }
+
+
+    static List<String> processConnectionMerges(String msg) {
+        if (msg) {
+            return processConnectionMerges(buildJSonParserfromMessage(msg))
         }
     }
 
@@ -42,6 +49,12 @@ class MessageProcessor {
     static List<String> processConnectionRelationships(String msg) {
         if (msg) {
             processConnectionRelationships(buildJSonParserfromMessage(msg))
+        }
+    }
+
+    static String processParameterJSON(String msg) {
+        if (msg) {
+            processParameterJSON(buildJSonParserfromMessage(msg))
         }
     }
 
@@ -65,6 +78,33 @@ class MessageProcessor {
         indexStatements
     }
 
+    static String processParameterJSON(Map msgMap) {
+        HashMap paramMap = flattenMessageMap(msgMap)
+        def paramsMap = [:]
+        paramsMap.put("params", paramMap)
+        new Gson().toJson(paramsMap)
+    }
+
+    private static HashMap flattenMessageMap(Map msgMap) {
+        flattenMessageMap(msgMap, true)
+    }
+
+    private static HashMap flattenMessageMap(Map msgMap, boolean includeConformedDimensions) {
+        def flattenedMap = new HashMap(msgMap)
+        flattenedMap.putAll(msgMap.Properties ?: [:])
+        if (includeConformedDimensions) {
+            flattenedMap.putAll(msgMap.ConformedDimensions ?: [:])
+        }
+        flattenedMap.remove("ConformedDimensions")
+        flattenedMap.remove("Connections")
+        flattenedMap.remove("NodeType")
+        flattenedMap.remove("Properties")
+        flattenedMap.remove("RelType")
+        flattenedMap.remove("ForwardRel")
+
+        flattenedMap
+    }
+
     /*
     MERGE (employee:Card:Employee {Email: "konrad.aust2@menome.com",EmployeeId: 12345}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Name= "Konrad Aust",employee.Priority= 1,employee.SourceSystem= "HRSystem",employee.Status= "active",employee.PreferredName= "The Chazzinator",employee.ResumeSkills= "programming,peeling bananas from the wrong end,handstands,sweet kickflips" ON MATCH SET employee.Name= "Konrad Aust",employee.Priority= 1,employee.SourceSystem= "HRSystem",employee.Status= "active",employee.PreferredName= "The Chazzinator",employee.ResumeSkills= "programming,peeling bananas from the wrong end,handstands,sweet kickflips" with employee
     MATCH (office:Office {City: "Victoria"}) WITH employee,office
@@ -75,68 +115,95 @@ class MessageProcessor {
     MERGE (employee)-[team_rel:HAS_FACET]->(team)
      */
 
-    static List<String> processMerges(Map msgMap, NodeType nodeType) {
+    static List<String> processMerges(Map msgMap) {
         def mergeStatements = []
         // Card Merge MERGE (employee:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})
         String msgNodeType = msgMap.NodeType
         String nodeName = msgNodeType.toLowerCase()
         def cardMerge = "MERGE (${nodeName}:Card:$msgNodeType "
 
-        if(nodeType == NodeType.RELATED){
-            def conformedDimensions = msgMap.ConformedDimensions
-            cardMerge = "MATCH (${nodeName}:$msgNodeType "
+        def conformedDimensions = msgMap.ConformedDimensions
+        if (conformedDimensions) {
             cardMerge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
-            cardMerge += " WITH ${nodeName} "
         }
 
-        if (nodeType == NodeType.PRIMARY) {
-            def conformedDimensions = msgMap.ConformedDimensions
-            if (conformedDimensions) {
-                cardMerge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
-            }
+        cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
 
-            cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
+        Map keysToProcess = flattenMessageMap(msgMap, false)
+        cardMerge += ", "
+        def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+        cardMerge += mergeExpression
+        cardMerge += " ON MATCH SET " + mergeExpression
 
-            if (nodeType == NodeType.PRIMARY) {
-                Map keysToProcess = [:]
-                keysToProcess.putAll(msgMap)
-                keysToProcess.putAll(msgMap.Properties ?: [:])
-                keysToProcess.remove("ConformedDimensions")
-                keysToProcess.remove("Connections")
-                keysToProcess.remove("NodeType")
-                keysToProcess.remove("Properties")
-                cardMerge += ", "
-                def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
-                cardMerge += mergeExpression
-                cardMerge += " ON MATCH SET " + mergeExpression
-                cardMerge += " WITH ${nodeName}"
-
-            } else {
-                cardMerge += ", ${nodeName}.Name = \"${msgMap.Name}\" , ${nodeName}.PendingMerge = true"
-            }
-        }
         mergeStatements << cardMerge
     }
 
-    private static String buildMergeExpressionFromMap(msgMap, valuePrefix, keySeparator) {
+    /*
+    MERGE (node1:Card:Project {Code: "5"})
+    ON CREATE SET node1.Uuid = {node1_newUuid}, node1.PendingMerge = true
+     */
+
+    static List<String> processConnectionMerges(Map msgMap) {
+        def mergeStatements = []
+        msgMap.Connections.each() {
+            String msgNodeType = it.NodeType
+            String nodeName = msgNodeType.toLowerCase()
+
+            String merge = "MERGE ($nodeName:$msgNodeType"
+
+            def conformedDimensions = it.ConformedDimensions
+            if (conformedDimensions) {
+                merge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
+            }
+
+            merge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
+            Map keysToProcess = flattenMessageMap(it, false)
+            merge += ", "
+            def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+            merge += mergeExpression
+            merge += " ON MATCH SET " + mergeExpression
+
+            mergeStatements << merge
+        }
+
+        mergeStatements
+    }
+
+    static String buildMergeExpressionFromMap(msgMap, valuePrefix, keySeparator) {
         String expression = ""
         msgMap.eachWithIndex { key, value, index ->
-            boolean valueIsNumeric = NumberUtils.isCreatable(value as String)
-            String valueDelimiter = ""
-            if (!valueIsNumeric) {
-                valueDelimiter = "\""
-            }
-            expression += "$valuePrefix$key$keySeparator $valueDelimiter$value$valueDelimiter" + (index < msgMap.size() - 1 ? "," : "")
+            expression += "$valuePrefix$key$keySeparator param.$key" + (index < msgMap.size() - 1 ? "," : "")
         }
         expression
     }
 
+    /*
+    MATCH (office:Office {City: "Victoria"}) WITH employee,office
+    MATCH (project:Project {Code: 5}) WITH employee,office,project
+    MATCH (team:Team {Code: 1337}) WITH employee,office,project,team
+
+     */
+
     static List<String> processConnectionNodes(Map msgMap) {
-        List<String> connectedNodeMergeStatements = []
+        List<String> connectedNodeMatchStatements = []
+        String primaryNodeType = msgMap.NodeType
+        String primaryNodeName = primaryNodeType.toLowerCase()
+
+        String withExpression = " WITH $primaryNodeName"
         msgMap.Connections.each { Map map ->
-            connectedNodeMergeStatements.addAll(processMerges(map, NodeType.RELATED))
+            String msgNodeType = map.NodeType
+            String nodeName = msgNodeType.toLowerCase()
+            String match = "MATCH ($nodeName:$msgNodeType {"
+            map.ConformedDimensions.eachWithIndex { key, value, index ->
+                match += "$key : param.$msgNodeType.$key" + (index < map.ConformedDimensions.size() - 1 ? "," : "")
+            }
+            withExpression = withExpression + "," + nodeName
+
+            match += "})"
+            match += withExpression
+            connectedNodeMatchStatements.add(match)
         }
-        connectedNodeMergeStatements
+        connectedNodeMatchStatements
     }
 
     static List<String> processConnectionRelationships(Map msgMap) {
@@ -154,8 +221,3 @@ class MessageProcessor {
         connectionRelationshipStatements
     }
 }
-
-enum NodeType {
-    PRIMARY, RELATED
-}
-
