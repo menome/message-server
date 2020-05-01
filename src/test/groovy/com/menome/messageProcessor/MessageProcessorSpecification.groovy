@@ -4,30 +4,30 @@ import com.menome.MessagingSpecification
 
 class MessageProcessorSpecification extends MessagingSpecification {
 
-    List<String> processMessage(String message,MessageProcessor.StatementType statementType) {
+    List<String> processMessage(String message, MessageProcessor.StatementType statementType) {
         MessageProcessor processor = new MessageProcessor()
-        Map<MessageProcessor.StatementType,List<String>> process = processor.process(message)
+        Map<MessageProcessor.StatementType, List<String>> process = processor.process(message)
         return process.get(statementType)
     }
 
     List<String> processPrimaryNodeMergeForMessageWithoutConnections() {
-        return processMessage(simpleMessage,MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
+        return processMessage(simpleMessage, MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
     }
 
     List<String> processPrimaryNodeMergeForMessageWithConnections() {
-        return processMessage(messageWithConnections,MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
+        return processMessage(messageWithConnections, MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
     }
 
     List<String> processIndexesForMessageWithConnections() {
-        return processMessage(messageWithConnections,MessageProcessor.StatementType.INDEXES)
+        return processMessage(messageWithConnections, MessageProcessor.StatementType.INDEXES)
     }
 
     List<String> processConnectionMergesMessageWithConnections() {
-        return processMessage(messageWithConnections,MessageProcessor.StatementType.CONNECTION_MERGE)
+        return processMessage(messageWithConnections, MessageProcessor.StatementType.CONNECTION_MERGE)
     }
 
     List<String> processConnectionMatchesMessageWithConnections() {
-        return processMessage(messageWithConnections,MessageProcessor.StatementType.CONNECTION_MATCH)
+        return processMessage(messageWithConnections, MessageProcessor.StatementType.CONNECTION_MATCH)
     }
 
 
@@ -46,7 +46,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         def msg = ""
         MessageProcessor processor = new MessageProcessor()
-        Map<MessageProcessor.StatementType,List<String>> statements = processor.process(msg)
+        Map<MessageProcessor.StatementType, List<String>> statements = processor.process(msg)
         expect:
         statements.isEmpty()
     }
@@ -54,7 +54,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process simple valid message"() {
         given:
-        List<String> statements =  processPrimaryNodeMergeForMessageWithoutConnections()
+        List<String> statements = processPrimaryNodeMergeForMessageWithoutConnections()
 
         expect:
         statements.size() == 1
@@ -132,19 +132,18 @@ class MessageProcessorSpecification extends MessagingSpecification {
         teamNode == "MERGE (employee)-[team_rel:HAS_FACET]->(team)"
     }
 
-    def "check all statement types"(){
+    def "check all statement types"() {
         given:
         MessageProcessor processor = new MessageProcessor()
         when:
-        Map<MessageProcessor.StatementType,List<String>> process = processor.process(messageWithConnections)
-        def list = process.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
+        Map<MessageProcessor.StatementType, List<String>> process = processor.process(messageWithConnections)
         then:
-        list.size() == 7
+        process.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE).size() == 7
         process.get(MessageProcessor.StatementType.INDEXES).size() == 2
         process.get(MessageProcessor.StatementType.CONNECTION_MERGE).size() == 3
     }
 
-    def "process parameter"(){
+    def "process parameter"() {
         given:
         String parms = MessageProcessor.processParameterJSON(messageWithConnections)
         String connectionParms = MessageProcessor.processParameterForConnectionsJSON(messageWithConnections)
