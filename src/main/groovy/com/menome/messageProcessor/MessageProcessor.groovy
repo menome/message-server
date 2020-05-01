@@ -1,7 +1,6 @@
 package com.menome.messageProcessor
 
 import com.google.gson.Gson
-import groovy.json.JsonSlurper
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -19,16 +18,16 @@ class MessageProcessor {
     static Map<StatementType, List<String>> process(String msg) {
         Map<StatementType, List<String>> typesOfStatements = [:]
         if (msg) {
-            def msgMap = buildJSonParserfromMessage(msg)
-            typesOfStatements.put(StatementType.PRIMARY_NODE_MERGE,processPrimaryNodeMerge(msgMap))
+            def msgMap = buildJSonParserFromMessage(msg)
+            typesOfStatements.put(StatementType.PRIMARY_NODE_MERGE, processPrimaryNodeMerge(msgMap))
             typesOfStatements.put(StatementType.INDEXES, processIndexes(msgMap))
-            typesOfStatements.put(StatementType.CONNECTION_MERGE,processConnectionMerges(msgMap))
-            typesOfStatements.put(StatementType.CONNECTION_MATCH,processConnectionMatches(msgMap))
+            typesOfStatements.put(StatementType.CONNECTION_MERGE, processConnectionMerges(msgMap))
+            typesOfStatements.put(StatementType.CONNECTION_MATCH, processConnectionMatches(msgMap))
         }
         typesOfStatements
     }
 
-        static List<String> processPrimaryNodeMerge(Map msgMap){
+    static List<String> processPrimaryNodeMerge(Map msgMap) {
         List<String> statements = []
         statements.addAll(processMerges(msgMap))
         statements.addAll(processConnectionMatches(msgMap))
@@ -39,13 +38,19 @@ class MessageProcessor {
 
     static String processParameterJSON(String msg) {
         if (msg) {
-            processParameterJSON(buildJSonParserfromMessage(msg))
+            processParameterJSON(buildJSonParserFromMessage(msg))
         }
     }
 
-    private static Map buildJSonParserfromMessage(String msg) {
-        def parser = new JsonSlurper()
-        def msgMap = parser.parseText(msg) as Map
+    static String processParameterForConnectionsJSON(String msg) {
+        if (msg) {
+            processParameterForConnectionsJSON(buildJSonParserFromMessage(msg))
+        }
+    }
+
+    private static Map buildJSonParserFromMessage(String msg) {
+        Gson gson = new Gson()
+        Map msgMap = gson.fromJson(msg,Map.class)
         msgMap
     }
 
@@ -64,14 +69,24 @@ class MessageProcessor {
     }
 
     static String processParameterJSON(Map msgMap) {
-        HashMap paramMap = flattenMessageMap(msgMap)
+        HashMap paramMap = flattenMessageMap(msgMap,true)
         def paramsMap = [:]
         paramsMap.put("params", paramMap)
         new Gson().toJson(paramsMap)
     }
 
-    private static HashMap flattenMessageMap(Map msgMap) {
-        flattenMessageMap(msgMap, true)
+
+    static String processParameterForConnectionsJSON(Map msgMap) {
+        Map paramMap = [:]
+        msgMap.Connections.each(){
+            Map connectionMap = [:]
+            connectionMap.putAll(it)
+            connectionMap.remove("ConformedDimensions")
+            paramMap.put( it.NodeType.toLowerCase(),connectionMap)
+        }
+        def paramsMap = [:]
+        paramsMap.put("params", paramMap)
+        new Gson().toJson(paramsMap)
     }
 
     private static HashMap flattenMessageMap(Map msgMap, boolean includeConformedDimensions) {
@@ -166,8 +181,7 @@ class MessageProcessor {
     MATCH (office:Office {City: "Victoria"}) WITH employee,office
     MATCH (project:Project {Code: 5}) WITH employee,office,project
     MATCH (team:Team {Code: 1337}) WITH employee,office,project,team
-
-     */
+    */
 
     static List<String> processConnectionMatches(Map msgMap) {
         List<String> connectedNodeMatchStatements = []

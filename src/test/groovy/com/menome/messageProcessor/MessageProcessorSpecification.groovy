@@ -132,10 +132,24 @@ class MessageProcessorSpecification extends MessagingSpecification {
         teamNode == "MERGE (employee)-[team_rel:HAS_FACET]->(team)"
     }
 
+    def "check all statement types"(){
+        given:
+        MessageProcessor processor = new MessageProcessor()
+        when:
+        Map<MessageProcessor.StatementType,List<String>> process = processor.process(messageWithConnections)
+        def list = process.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
+        then:
+        list.size() == 7
+        process.get(MessageProcessor.StatementType.INDEXES).size() == 2
+        process.get(MessageProcessor.StatementType.CONNECTION_MERGE).size() == 3
+    }
+
     def "process parameter"(){
         given:
         String parms = MessageProcessor.processParameterJSON(messageWithConnections)
+        String connectionParms = MessageProcessor.processParameterForConnectionsJSON(messageWithConnections)
         expect:
-        parms
+        parms == '''{"params":{"Status":"active","Email":"konrad.aust@menome.com","Priority":1.0,"PreferredName":"The Chazzinator","EmployeeId":12345.0,"SourceSystem":"HRSystem","ResumeSkills":"programming,peeling bananas from the wrong end,handstands,sweet kickflips","Name":"Konrad Aust"}}'''
+        connectionParms == '''{"params":{"office":{"Name":"Menome Victoria","NodeType":"Office","RelType":"LocatedInOffice","ForwardRel":true},"project":{"Name":"theLink","NodeType":"Project","RelType":"WorkedOnProject","ForwardRel":true},"team":{"Name":"theLink Product Team","NodeType":"Team","Label":"Facet","RelType":"HAS_FACET","ForwardRel":true}}}'''
     }
 }
