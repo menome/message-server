@@ -4,18 +4,32 @@ import com.menome.MessagingSpecification
 
 class MessageProcessorSpecification extends MessagingSpecification {
 
-    List<String> processMessage(String message) {
+    List<String> processMessage(String message,MessageProcessor.StatementType statementType) {
         MessageProcessor processor = new MessageProcessor()
-        return processor.process(message)
+        Map<MessageProcessor.StatementType,List<String>> process = processor.process(message)
+        return process.get(statementType)
     }
 
-    List<String> processSimpleMessage() {
-        return processMessage(simpleMessage)
+    List<String> processPrimaryNodeMergeForMessageWithoutConnections() {
+        return processMessage(simpleMessage,MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
     }
 
-    List<String> processMessageWithConnections() {
-        return processMessage(messageWithConnections)
+    List<String> processPrimaryNodeMergeForMessageWithConnections() {
+        return processMessage(messageWithConnections,MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
     }
+
+    List<String> processIndexesForMessageWithConnections() {
+        return processMessage(messageWithConnections,MessageProcessor.StatementType.INDEXES)
+    }
+
+    List<String> processConnectionMergesMessageWithConnections() {
+        return processMessage(messageWithConnections,MessageProcessor.StatementType.CONNECTION_MERGE)
+    }
+
+    List<String> processConnectionMatchesMessageWithConnections() {
+        return processMessage(messageWithConnections,MessageProcessor.StatementType.CONNECTION_MATCH)
+    }
+
 
     String getStatementFromList(List<String> list, String statementFragment) {
         String statement = ""
@@ -32,7 +46,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         def msg = ""
         MessageProcessor processor = new MessageProcessor()
-        List<String> statements = processor.process(msg)
+        Map<MessageProcessor.StatementType,List<String>> statements = processor.process(msg)
         expect:
         statements.isEmpty()
     }
@@ -40,7 +54,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process simple valid message"() {
         given:
-        List<String> statements =  processSimpleMessage()
+        List<String> statements =  processPrimaryNodeMergeForMessageWithoutConnections()
 
         expect:
         statements.size() == 1
@@ -48,7 +62,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process message with connections"() {
         given:
-        List<String> statements = processMessageWithConnections()
+        List<String> statements = processPrimaryNodeMergeForMessageWithConnections()
         expect:
         statements.size() == 7
     }
@@ -57,7 +71,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         def expectedCardIndex = "CREATE INDEX ON :Card(Email,EmployeeId)"
         def expectedEmployeeIndex = "CREATE INDEX ON :Employee(Email,EmployeeId)"
-        List<String> indexStatements = MessageProcessor.processIndexes(simpleMessage)
+        List<String> indexStatements = processIndexesForMessageWithConnections()
 
         expect:
         indexStatements.size() == 2
@@ -70,7 +84,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process merge from simple message"() {
         given:
-        List<String> mergeStatements = MessageProcessor.processMerges(simpleMessage)
+        List<String> mergeStatements = processPrimaryNodeMergeForMessageWithoutConnections()
         expect:
         mergeStatements.size() == 1
         mergeStatements[0] == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name"
@@ -79,7 +93,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process connection merges from connection message"() {
         given:
-        List<String> mergeStatements = MessageProcessor.processConnectionMerges(messageWithConnections)
+        List<String> mergeStatements = processConnectionMergesMessageWithConnections()
         String officeNode = getStatementFromList(mergeStatements, ":Office")
         String projectNode = getStatementFromList(mergeStatements, ":Project")
         String teamNode = getStatementFromList(mergeStatements, ":Team")
@@ -94,7 +108,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process connection matches from connection message"() {
         given:
-        List<String> connectionStatements = MessageProcessor.processConnectionNodes(messageWithConnections)
+        List<String> connectionStatements = processConnectionMatchesMessageWithConnections()
         String officeNode = getStatementFromList(connectionStatements, ":Office")
         String projectNode = getStatementFromList(connectionStatements, ":Project")
         String teamNode = getStatementFromList(connectionStatements, ":Team")
@@ -108,13 +122,11 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process connection relationships from connection message"() {
         given:
-        List<String> connectionStatements = MessageProcessor.processConnectionRelationships(messageWithConnections)
+        List<String> connectionStatements = processPrimaryNodeMergeForMessageWithConnections()
         String officeNode = getStatementFromList(connectionStatements, ":LocatedInOffice")
         String projectNode = getStatementFromList(connectionStatements, ":WorkedOnProject")
         String teamNode = getStatementFromList(connectionStatements, ":HAS_FACET")
         expect:
-        // We should have One Office, One Project and One Team
-        connectionStatements.size() == 3
         officeNode == "MERGE (employee)-[office_rel:LocatedInOffice]->(office)"
         projectNode == "MERGE (employee)-[project_rel:WorkedOnProject]->(project)"
         teamNode == "MERGE (employee)-[team_rel:HAS_FACET]->(team)"

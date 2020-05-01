@@ -7,50 +7,35 @@ import org.slf4j.LoggerFactory
 
 class MessageProcessor {
 
+    enum StatementType {
+        PRIMARY_NODE_MERGE,
+        INDEXES,
+        CONNECTION_MERGE,
+        CONNECTION_MATCH
+    }
+
     static Logger log = LoggerFactory.getLogger(MessageProcessor.class)
 
-    static List<String> process(String msg) {
-        List<String> statements = []
+    static Map<StatementType, List<String>> process(String msg) {
+        Map<StatementType, List<String>> typesOfStatements = [:]
         if (msg) {
-            //statements.addAll(processIndexes(msg))
-            statements.addAll(processMerges(msg))
-            statements.addAll(processConnectionNodes(msg))
-            statements.addAll(processConnectionRelationships(msg))
+            def msgMap = buildJSonParserfromMessage(msg)
+            typesOfStatements.put(StatementType.PRIMARY_NODE_MERGE,processPrimaryNodeMerge(msgMap))
+            typesOfStatements.put(StatementType.INDEXES, processIndexes(msgMap))
+            typesOfStatements.put(StatementType.CONNECTION_MERGE,processConnectionMerges(msgMap))
+            typesOfStatements.put(StatementType.CONNECTION_MATCH,processConnectionMatches(msgMap))
         }
+        typesOfStatements
+    }
+
+        static List<String> processPrimaryNodeMerge(Map msgMap){
+        List<String> statements = []
+        statements.addAll(processMerges(msgMap))
+        statements.addAll(processConnectionMatches(msgMap))
+        statements.addAll(processConnectionRelationships(msgMap))
         statements
     }
 
-    static List<String> processMerges(String msg) {
-        if (msg) {
-            return processMerges(buildJSonParserfromMessage(msg))
-        }
-    }
-
-
-    static List<String> processConnectionMerges(String msg) {
-        if (msg) {
-            return processConnectionMerges(buildJSonParserfromMessage(msg))
-        }
-    }
-
-
-    static List<String> processIndexes(String msg) {
-        if (msg) {
-            processIndexes(buildJSonParserfromMessage(msg))
-        }
-    }
-
-    static List<String> processConnectionNodes(String msg) {
-        if (msg) {
-            processConnectionNodes(buildJSonParserfromMessage(msg))
-        }
-    }
-
-    static List<String> processConnectionRelationships(String msg) {
-        if (msg) {
-            processConnectionRelationships(buildJSonParserfromMessage(msg))
-        }
-    }
 
     static String processParameterJSON(String msg) {
         if (msg) {
@@ -184,7 +169,7 @@ class MessageProcessor {
 
      */
 
-    static List<String> processConnectionNodes(Map msgMap) {
+    static List<String> processConnectionMatches(Map msgMap) {
         List<String> connectedNodeMatchStatements = []
         String primaryNodeType = msgMap.NodeType
         String primaryNodeName = primaryNodeType.toLowerCase()

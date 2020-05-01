@@ -16,6 +16,7 @@ import reactor.rabbitmq.ReceiverOptions;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -40,8 +41,7 @@ public class DataRefineryServer {
 
         ReceiverOptions receiverOptions = new ReceiverOptions()
                 .connectionFactory(rabbitConnectionFactory)
-                .connectionSupplier(cf -> cf.newConnection(new Address[]{new Address("127.0.0.1")}, RABBITMQ_QUEUE_NAME))
-                ;
+                .connectionSupplier(cf -> cf.newConnection(new Address[]{new Address("127.0.0.1")}, RABBITMQ_QUEUE_NAME));
 
         Driver driver = Neo4J.openDriver(neo4JContainer);
         Neo4J.run(driver, "CREATE INDEX ON :Employee(Email,EmployeeId)");
@@ -104,7 +104,7 @@ public class DataRefineryServer {
                 .subscribe(m -> {
                     byte[] body = m.getBody();
                     String msg = new String(body);
-                    Task task = new Task(driver,msg);
+                    Task task = new Task(driver, msg);
                     executor.submit(task);
                 });
     }
@@ -114,7 +114,7 @@ public class DataRefineryServer {
         private final Driver driver;
         private final String message;
 
-        public Task(Driver driver,String message) {
+        public Task(Driver driver, String message) {
             this.driver = driver;
             this.message = message;
         }
@@ -122,13 +122,14 @@ public class DataRefineryServer {
         @Override
         public void run() {
             //System.out.println(Thread.currentThread().getName() + " " + message);
-            if (message.contains("t1@") || message.contains("t5000@")){
+            if (message.contains("t1@") || message.contains("t5000@")) {
                 System.out.println("Time:" + Instant.now());
             }
-            List<String> statements = MessageProcessor.process(message);
+            Map<MessageProcessor.StatementType, List<String>> statements = MessageProcessor.process(message);
+
             Session session = driver.session();
             System.out.println("statements = " + statements);
-            Neo4J.executeStatementListInSession(statements, session);
+            Neo4J.executeStatementListInSession(statements.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE), session);
             session.close();
         }
     }
