@@ -11,7 +11,7 @@ import spock.lang.Specification
 
 import java.time.Duration
 
-class MessagingSpecification extends Specification{
+class MessagingSpecification extends Specification {
 
     protected static final int NEO4J_BOLT_API_PORT = 7687
     protected static final int NEO4J_WEB_PORT = 7474
@@ -49,6 +49,19 @@ class MessagingSpecification extends Specification{
             .Connections([office, project, team])
             .build()
             .toJSON()
+
+    protected static List<String> threeMessageBatch = (1..3).collect() {
+        MessageBuilder.builder()
+                .Name("Konrad Aust")
+                .NodeType("Employee")
+                .Priority(1)
+                .SourceSystem("HRSystem")
+                .ConformedDimensions("Email": "konrad.aust" + it + "@menome.com", "EmployeeId": 12345)
+                .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
+                .Connections([office, project, team])
+                .build()
+                .toJSON()
+    }
 
     protected static GenericContainer createAndStartNeo4JContainer(Network network) {
         GenericContainer neo4JContainer = new GenericContainer("neo4j:4.0.3")
