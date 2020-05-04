@@ -100,9 +100,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
         expect:
         mergeStatements.size() == 3
-        officeNode == "MERGE (office:Office{City: param.City}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name= param.Name ON MATCH SET office.Name= param.Name"
-        projectNode == "MERGE (project:Project{Code: param.Code}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.Name= param.Name ON MATCH SET project.Name= param.Name"
-        teamNode == "MERGE (team:Team{Code: param.Code}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime(), team.Label= param.Label,team.Name= param.Name ON MATCH SET team.Label= param.Label,team.Name= param.Name"
+        officeNode == "MERGE (office:Office{City: param.office.City}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name= param.office.Name ON MATCH SET office.Name= param.office.Name"
+        projectNode == "MERGE (project:Project{Code: param.project.Code}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.Name= param.project.Name ON MATCH SET project.Name= param.project.Name"
+        teamNode == "MERGE (team:Team{Code: param.team.Code}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime(), team.Label= param.team.Label,team.Name= param.team.Name ON MATCH SET team.Label= param.team.Label,team.Name= param.team.Name"
 
     }
 
@@ -115,9 +115,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
         expect:
         // We should have One Office, One Project and One Team
         connectionStatements.size() == 3
-        officeNode == "MATCH (office:Office {City : param.Office.City}) WITH employee,office"
-        projectNode == "MATCH (project:Project {Code : param.Project.Code}) WITH employee,office,project"
-        teamNode == "MATCH (team:Team {Code : param.Team.Code}) WITH employee,office,project,team"
+        officeNode == "MATCH (office:Office {City : param.office.City}) WITH employee,office"
+        projectNode == "MATCH (project:Project {Code : param.project.Code}) WITH employee,office,project"
+        teamNode == "MATCH (team:Team {Code : param.team.Code}) WITH employee,office,project,team"
     }
 
     def "process connection relationships from connection message"() {

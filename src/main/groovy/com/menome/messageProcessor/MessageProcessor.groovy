@@ -50,7 +50,7 @@ class MessageProcessor {
 
     private static Map buildJSonParserFromMessage(String msg) {
         Gson gson = new Gson()
-        Map msgMap = gson.fromJson(msg,Map.class)
+        Map msgMap = gson.fromJson(msg, Map.class)
         msgMap
     }
 
@@ -69,7 +69,7 @@ class MessageProcessor {
     }
 
     static String processParameterJSON(Map msgMap) {
-        HashMap paramMap = flattenMessageMap(msgMap,true)
+        HashMap paramMap = flattenMessageMap(msgMap, true)
         def paramsMap = [:]
         paramsMap.put("params", paramMap)
         new Gson().toJson(paramsMap)
@@ -78,11 +78,11 @@ class MessageProcessor {
 
     static String processParameterForConnectionsJSON(Map msgMap) {
         Map paramMap = [:]
-        msgMap.Connections.each(){
+        msgMap.Connections.each() {
             Map connectionMap = [:]
             connectionMap.putAll(it)
             connectionMap.remove("ConformedDimensions")
-            paramMap.put( it.NodeType.toLowerCase(),connectionMap)
+            paramMap.put(it.NodeType.toLowerCase(), connectionMap)
         }
         def paramsMap = [:]
         paramsMap.put("params", paramMap)
@@ -124,42 +124,39 @@ class MessageProcessor {
 
         def conformedDimensions = msgMap.ConformedDimensions
         if (conformedDimensions) {
-            cardMerge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
+            cardMerge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":", ".") + "})"
         }
 
         cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
 
         Map keysToProcess = flattenMessageMap(msgMap, false)
         cardMerge += ", "
-        def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+        def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=",".")
         cardMerge += mergeExpression
         cardMerge += " ON MATCH SET " + mergeExpression
 
         mergeStatements << cardMerge
     }
 
-    /*
-    MERGE (node1:Card:Project {Code: "5"})
-    ON CREATE SET node1.Uuid = {node1_newUuid}, node1.PendingMerge = true
-     */
 
     static List<String> processConnectionMerges(Map msgMap) {
         def mergeStatements = []
         msgMap.Connections.each() {
             String msgNodeType = it.NodeType
             String nodeName = msgNodeType.toLowerCase()
-
+            String parameterPrefix = "." + nodeName + "."
             String merge = "MERGE ($nodeName:$msgNodeType"
 
             def conformedDimensions = it.ConformedDimensions
             if (conformedDimensions) {
-                merge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
+
+                merge += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":", parameterPrefix) + "})"
             }
 
             merge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
             Map keysToProcess = flattenMessageMap(it, false)
             merge += ", "
-            def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+            def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=",parameterPrefix)
             merge += mergeExpression
             merge += " ON MATCH SET " + mergeExpression
 
@@ -169,10 +166,10 @@ class MessageProcessor {
         mergeStatements
     }
 
-    static String buildMergeExpressionFromMap(msgMap, valuePrefix, keySeparator) {
+    static String buildMergeExpressionFromMap(msgMap, valuePrefix, keySeparator, String keyPrefix) {
         String expression = ""
         msgMap.eachWithIndex { key, value, index ->
-            expression += "$valuePrefix$key$keySeparator param.$key" + (index < msgMap.size() - 1 ? "," : "")
+            expression += "$valuePrefix$key$keySeparator param$keyPrefix$key" + (index < msgMap.size() - 1 ? "," : "")
         }
         expression
     }
@@ -194,7 +191,7 @@ class MessageProcessor {
             String nodeName = msgNodeType.toLowerCase()
             String match = "MATCH ($nodeName:$msgNodeType {"
             map.ConformedDimensions.eachWithIndex { key, value, index ->
-                match += "$key : param.$msgNodeType.$key" + (index < map.ConformedDimensions.size() - 1 ? "," : "")
+                match += "$key : param.$nodeName.$key" + (index < map.ConformedDimensions.size() - 1 ? "," : "")
             }
             withExpression = withExpression + "," + nodeName
 
