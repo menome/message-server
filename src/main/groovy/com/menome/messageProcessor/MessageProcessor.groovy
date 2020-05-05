@@ -36,9 +36,15 @@ class MessageProcessor {
     }
 
 
-    static String processParameterJSON(String msg) {
+    static Map<String,String> processPrimaryNodeParametersAsMap(String msg) {
         if (msg) {
-            processParameterJSON(buildJSonParserFromMessage(msg))
+            processPrimaryNodeParametersAsMap(buildJSonParserFromMessage(msg))
+        }
+    }
+
+    static String processPrimaryNodeParametersAsJSON(String msg) {
+        if (msg) {
+            new Gson().toJson(processPrimaryNodeParametersAsMap(buildJSonParserFromMessage(msg)))
         }
     }
 
@@ -68,11 +74,8 @@ class MessageProcessor {
         indexStatements
     }
 
-    static String processParameterJSON(Map msgMap) {
-        HashMap paramMap = flattenMessageMap(msgMap, true)
-        def paramsMap = [:]
-        paramsMap.put("params", paramMap)
-        new Gson().toJson(paramsMap)
+    static Map<String, String> processPrimaryNodeParametersAsMap(Map msgMap) {
+        flattenMessageMap(msgMap, true)
     }
 
 
@@ -133,7 +136,7 @@ class MessageProcessor {
         def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
         cardMerge += mergeExpression
         cardMerge += " ON MATCH SET " + mergeExpression
-
+        cardMerge += " WITH $nodeName,param "
         mergeStatements << cardMerge
     }
 
@@ -183,13 +186,13 @@ class MessageProcessor {
         String primaryNodeType = msgMap.NodeType
         String primaryNodeName = primaryNodeType.toLowerCase()
 
-        String withExpression = " WITH $primaryNodeName"
+        String withExpression = " WITH $primaryNodeName, param"
         msgMap.Connections.each { Map map ->
             String msgNodeType = map.NodeType
             String nodeName = msgNodeType.toLowerCase()
             String match = "MATCH ($nodeName:$msgNodeType {"
             map.ConformedDimensions.eachWithIndex { key, value, index ->
-                match += "$key : param.$key" + (index < map.ConformedDimensions.size() - 1 ? "," : "")
+                match += "$key : param.$nodeName$key" + (index < map.ConformedDimensions.size() - 1 ? "," : "")
             }
             withExpression = withExpression + "," + nodeName
 
@@ -223,6 +226,6 @@ class MessageProcessor {
      * @return Message Type
      */
     static String deriveMessageTypeFromStatement(String statement) {
-        statement.substring(7,statement.indexOf(":"))
+        statement.substring(7, statement.indexOf(":"))
     }
 }

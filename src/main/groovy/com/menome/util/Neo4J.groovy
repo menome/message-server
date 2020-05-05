@@ -36,6 +36,9 @@ class Neo4J {
 
 
     static executeStatementListInSession(List<String> statements, Session session) {
+        executeStatementListInSession(statements,session,[:])
+    }
+    static executeStatementListInSession(List<String> statements, Session session, Map parameters) {
         String statement = ""
         statements.each() {
             statement += it + " \n"
@@ -44,8 +47,8 @@ class Neo4J {
             @Override
             execute(Transaction tx) {
                 try {
-                    tx.run(statement)
-                } catch(Throwable ex){
+                    tx.run(statement, parameters)
+                } catch (Throwable ex) {
                     println ex
                 }
             }

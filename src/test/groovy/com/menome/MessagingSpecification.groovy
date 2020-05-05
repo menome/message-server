@@ -63,6 +63,19 @@ class MessagingSpecification extends Specification {
                 .toJSON()
     }
 
+    protected static List<String> fiveThousandMessageBatch = (1..5000).collect() {
+        MessageBuilder.builder()
+                .Name("Konrad Aust")
+                .NodeType("Employee")
+                .Priority(1)
+                .SourceSystem("HRSystem")
+                .ConformedDimensions("Email": "konrad.aust" + UUID.randomUUID() + "@menome.com", "EmployeeId": UUID.randomUUID())
+                .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
+                .Connections([office, project, team])
+                .build()
+                .toJSON()
+    }
+
     protected static GenericContainer createAndStartNeo4JContainer(Network network) {
         GenericContainer neo4JContainer = new GenericContainer("neo4j:4.0.3")
                 .withNetwork(network)

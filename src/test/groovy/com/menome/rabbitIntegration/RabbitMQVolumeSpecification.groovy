@@ -92,12 +92,14 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         when:
         (1..messagesToWrite).each { it ->
             String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
-            println "Publishing:$message"
+            //println "Publishing:$message"
             rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
         }
         await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == messagesToWrite }
         then:
         1 == 1
+        println("Done...")
+        sleep(1000000000)
     }
 
     def "write 5000 messages to rabbit"() {

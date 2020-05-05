@@ -87,7 +87,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         List<String> mergeStatements = processPrimaryNodeMergeForMessageWithoutConnections()
         expect:
         mergeStatements.size() == 1
-        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name"
+        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name WITH employee "
     }
 
 
@@ -145,10 +145,10 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process parameter"() {
         given:
-        String parms = MessageProcessor.processParameterJSON(messageWithConnections)
+        Map<String,String> parms = MessageProcessor.processPrimaryNodeParametersAsMap(messageWithConnections)
         Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(messageWithConnections)
         expect:
-        parms == '''{"params":{"Status":"active","Email":"konrad.aust@menome.com","Priority":1.0,"PreferredName":"The Chazzinator","EmployeeId":12345.0,"SourceSystem":"HRSystem","ResumeSkills":"programming,peeling bananas from the wrong end,handstands,sweet kickflips","Name":"Konrad Aust"}}'''
+        parms == [Status:"active", Email:"konrad.aust@menome.com", Priority:1.0, PreferredName:"The Chazzinator", EmployeeId:12345.0, SourceSystem:"HRSystem", ResumeSkills:"programming,peeling bananas from the wrong end,handstands,sweet kickflips", Name:"Konrad Aust"]
         connectionParms == [office: [Name: "Menome Victoria", NodeType: "Office", RelType: "LocatedInOffice", ForwardRel: true, City: "Victoria"], project: [Name: "theLink", NodeType: "Project", RelType: "WorkedOnProject", ForwardRel: true, Code: "5"], team: [Name: "theLink Product Team", NodeType: "Team", Label: "Facet", RelType: "HAS_FACET", ForwardRel: true, Code: "1337"]]
     }
 
