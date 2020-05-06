@@ -87,7 +87,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         List<String> mergeStatements = processPrimaryNodeMergeForMessageWithoutConnections()
         expect:
         mergeStatements.size() == 1
-        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name WITH employee "
+        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name WITH employee,param "
     }
 
 
@@ -115,9 +115,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
         expect:
         // We should have One Office, One Project and One Team
         connectionStatements.size() == 3
-        officeNode == "MATCH (office:Office {City : param.City}) WITH employee,office"
-        projectNode == "MATCH (project:Project {Code : param.Code}) WITH employee,office,project"
-        teamNode == "MATCH (team:Team {Code : param.Code}) WITH employee,office,project,team"
+        officeNode == "MATCH (office:Office {City : param.officeCity}) WITH employee,param,office"
+        projectNode == "MATCH (project:Project {Code : param.projectCode}) WITH employee,param,office,project"
+        teamNode == "MATCH (team:Team {Code : param.teamCode}) WITH employee,param,office,project,team"
     }
 
     def "process connection relationships from connection message"() {

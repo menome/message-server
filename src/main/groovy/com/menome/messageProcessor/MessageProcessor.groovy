@@ -186,7 +186,7 @@ class MessageProcessor {
         String primaryNodeType = msgMap.NodeType
         String primaryNodeName = primaryNodeType.toLowerCase()
 
-        String withExpression = " WITH $primaryNodeName, param"
+        String withExpression = " WITH $primaryNodeName,param"
         msgMap.Connections.each { Map map ->
             String msgNodeType = map.NodeType
             String nodeName = msgNodeType.toLowerCase()
