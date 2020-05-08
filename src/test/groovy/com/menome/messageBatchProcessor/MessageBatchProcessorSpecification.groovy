@@ -14,35 +14,33 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
     @Shared
     GenericContainer neo4JContainer
 
-    def setup() {
+    def xsetup() {
         neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork())
     }
 
     def "three messages comparing full batch script"() {
         given:
         List<String> threeMessageBatch = threeMessageBatch
-        Driver driver = Neo4J.openDriver(neo4JContainer)
-        MessageBatchProcessor.process(threeMessageBatch, driver)
+        Driver driver = Neo4J.openDriver()
+        MessageBatchProcessor.process(threeMessageBatch, driver,false)
         expect:
         1 == 1
-        sleep(10000000)
 
     }
 
     def "five hundred messages comparing full batch script"() {
         given:
         List<String> fiveHundredMessageBatch = fiveThousandMessageBatch
-        Driver driver = Neo4J.openDriver(neo4JContainer)
+        Driver driver = Neo4J.openDriver()
         def start = Instant.now()
         println("Starting:$start")
-        MessageBatchProcessor.process(fiveHundredMessageBatch, driver,true)
+        MessageBatchProcessor.process(fiveHundredMessageBatch, driver,false)
         def end = Instant.now()
         def seconds = Duration.between(start, end).getSeconds()
         println("Duration $seconds")
         println("Finished $end")
         expect:
         1 == 1
-        sleep(10000000)
 
     }
 

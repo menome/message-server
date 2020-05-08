@@ -1,25 +1,24 @@
 package com.menome.datarefinery;
 
-import com.menome.messageProcessor.MessageProcessor;
+import com.menome.messageBatchProcessor.MessageBatchProcessor;
 import com.menome.util.Neo4J;
 import com.rabbitmq.client.Address;
 import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Delivery;
 import org.neo4j.driver.Driver;
-import org.neo4j.driver.Session;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
 import reactor.rabbitmq.RabbitFlux;
 import reactor.rabbitmq.Receiver;
 import reactor.rabbitmq.ReceiverOptions;
 
-import java.time.Duration;
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class DataRefineryServer {
 
@@ -29,13 +28,15 @@ public class DataRefineryServer {
     protected static final int NEO4J_BOLT_API_PORT = 7687;
     protected static final int NEO4J_WEB_PORT = 7474;
 
+    static ExecutorService executor = Executors.newFixedThreadPool(10);
+    static Logger log = LoggerFactory.getLogger(DataRefineryServer.class);
 
     public static void main(String[] args) {
+        startServer();
+    }
 
-        System.out.println("Starting Server...");
-
-        GenericContainer neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork());
-
+    public static void startServer() {
+        log.info("Starting Server...");
 
         ConnectionFactory rabbitConnectionFactory = createRabbitConnectionFactory();
 
@@ -43,15 +44,9 @@ public class DataRefineryServer {
                 .connectionFactory(rabbitConnectionFactory)
                 .connectionSupplier(cf -> cf.newConnection(new Address[]{new Address("127.0.0.1")}, RABBITMQ_QUEUE_NAME));
 
-        Driver driver = Neo4J.openDriver(neo4JContainer);
-        Neo4J.run(driver, "CREATE INDEX ON :Employee(Email,EmployeeId)");
-        Neo4J.run(driver, "CREATE INDEX ON :Card(Email,EmployeeId)");
-        Neo4J.run(driver, "MERGE (team:Card:Team {Code: 1337}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime(), team.Name = \"theLink Product Team\" , team.PendingMerge = true");
-        Neo4J.run(driver, "MERGE (project:Card:Project {Code: 5}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.Name = \"theLink\" , project.PendingMerge = true");
-        Neo4J.run(driver, "MERGE (office:Card:Office {City: \"Victoria\"}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name = \"Menome Victoria\" , office.PendingMerge = true");
+        Driver driver = Neo4J.openDriver();
 
 
-        ExecutorService executor = Executors.newFixedThreadPool(10);
         try {
             executor.awaitTermination(20l, TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
@@ -60,15 +55,16 @@ public class DataRefineryServer {
 
         Receiver rabbitReceiver = RabbitFlux.createReceiver(receiverOptions);
         consume(executor, rabbitReceiver, driver);
-
-        /*
-        Todo: Need some way to shutdown the executor service. Message on a queue?
-        executor.shutdown();
-        executor.shutdownNow();
-         */
+        log.info("Server Started");
     }
 
+    public static void stopServer() {
+        executor.shutdown();
+        log.info("Server Shutdown");
 
+    }
+
+    //todo: Figure out where to read the connection information from
     private static ConnectionFactory createRabbitConnectionFactory() {
         ConnectionFactory rabbitConnectionFactory = new ConnectionFactory();
         rabbitConnectionFactory.setHost("127.0.0.1");
@@ -79,58 +75,70 @@ public class DataRefineryServer {
         return rabbitConnectionFactory;
     }
 
-    private static GenericContainer createAndStartNeo4JContainer(Network network) {
-        GenericContainer neo4JContainer = new GenericContainer("neo4j:4.0.3")
-                .withNetwork(network)
-                .withNetworkAliases("neo4j")
-                .withExposedPorts(NEO4J_WEB_PORT)
-                .withExposedPorts(NEO4J_BOLT_API_PORT)
-                .withEnv("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes")
-                .withEnv("NEO4J_AUTH", "neo4j/password")
-                .withEnv("NEO4JLABS_PLUGINS", "[\"apoc\"]")
-                .withStartupTimeout(Duration.ofMinutes(5));
-
-        neo4JContainer.start();
-
-        System.out.println("Neo4J - Bolt bolt://localhost:" + neo4JContainer.getMappedPort(NEO4J_BOLT_API_PORT));
-        System.out.println("Neo4J - Web http://localhost:" + neo4JContainer.getMappedPort(NEO4J_WEB_PORT));
-
-        return neo4JContainer;
-    }
-
 
     private static Disposable consume(ExecutorService executor, Receiver rabbitReceiver, Driver driver) {
         return rabbitReceiver.consumeAutoAck(RABBITMQ_QUEUE_NAME)
-                .subscribe(m -> {
-                    byte[] body = m.getBody();
-                    String msg = new String(body);
-                    Task task = new Task(driver, msg);
-                    executor.submit(task);
-                });
+                .doOnNext(new Consumer<Delivery>() {
+                    int counter = 0;
+
+                    List<String> messages = new ArrayList<>();
+
+                    private boolean purgeCheck(){
+
+                        return true;
+                    }
+
+                    @Override
+                    public void accept(Delivery delivery) {
+                        counter++;
+                        String message = new String(delivery.getBody());
+                        messages.add(message);
+                        log.debug(message);
+                        //todo Make the batch size configurable
+                        if (counter == 5000 || purgeCheck()) {
+                            counter = 0;
+                            List<String> messageBatch = new ArrayList<>(messages);
+                            //Task task = new Task(driver, messageBatch);
+                            //executor.execute(task);
+                            //System.out.println("Processing Batch");
+                            long start = System.nanoTime();
+                            MessageBatchProcessor.process(messageBatch, driver, false);
+                            long finish = System.nanoTime();
+
+                            //System.out.println("Done Processing Batch:" + seconds);
+                            log.info("elapsed = " + (finish - start) / 1000000);
+                            messages = new ArrayList<>();
+                        }
+                        //todo: Need some way of processing smaller batches when the queue is empty maybe a countdown latch that another process can watch?
+                    }
+                })
+                .subscribe();
     }
+
+
+    /*
+
+        println("Starting:$start")
+        MessageBatchProcessor.process(fiveHundredMessageBatch, driver,true)
+
+        def seconds =
+
+     */
 
     static class Task implements Runnable {
 
         private final Driver driver;
-        private final String message;
+        private final List<String> messages;
 
-        public Task(Driver driver, String message) {
+        public Task(Driver driver, List<String> messages) {
             this.driver = driver;
-            this.message = message;
+            this.messages = messages;
         }
 
         @Override
         public void run() {
-            //System.out.println(Thread.currentThread().getName() + " " + message);
-            if (message.contains("t1@") || message.contains("t5000@")) {
-                System.out.println("Time:" + Instant.now());
-            }
-            Map<MessageProcessor.StatementType, List<String>> statements = MessageProcessor.process(message);
-
-            Session session = driver.session();
-            System.out.println("statements = " + statements);
-            Neo4J.executeStatementListInSession(statements.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE), session);
-            session.close();
+            log.debug(Thread.currentThread().getName() + " " + messages.size());
+            MessageBatchProcessor.process(messages, driver, false);
         }
     }
 }

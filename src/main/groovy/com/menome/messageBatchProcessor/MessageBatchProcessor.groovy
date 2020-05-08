@@ -4,19 +4,24 @@ package com.menome.messageBatchProcessor
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.util.Neo4J
 import org.neo4j.driver.Driver
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 class MessageBatchProcessor {
 
-    static String process(List<String> messages, Driver driver,boolean createIndexes) {
+    static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
+
+    static String process(List<String> messages, Driver driver, boolean createIndexes) {
         HashSet indexes = []
         HashSet connectionMerges = []
 
         // Todo this is wrong. We need to collect up all the unique indexes and conformed dimension merge parameters for the entire set not just the first entry
         Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(messages.get(0))
-            indexes.addAll(statementMap.get(MessageProcessor.StatementType.INDEXES))
+        indexes.addAll(statementMap.get(MessageProcessor.StatementType.INDEXES))
         connectionMerges.addAll(statementMap.get(MessageProcessor.StatementType.CONNECTION_MERGE))
         Map params = MessageProcessor.processParameterForConnections(messages.get(0))
 
+        //RETURN apoc.schema.node.indexExists("Card", ["Email","EmployeeId"])
         if (createIndexes) {
             Neo4J.run(driver, statementMap.get(MessageProcessor.StatementType.INDEXES), [:])
         }
@@ -32,9 +37,9 @@ class MessageBatchProcessor {
         List<Map<String, String>> nodeParameters = []
         messages.each() { String message ->
             def map = MessageProcessor.processPrimaryNodeParametersAsMap(message)
-            map.put("officeCity","Victoria")
-            map.put("projectCode","5")
-            map.put("teamCode","1337")
+            map.put("officeCity", "Victoria")
+            map.put("projectCode", "5")
+            map.put("teamCode", "1337")
             //map.putAll(MessageProcessor.processParameterForConnections(message))
             nodeParameters.addAll(map)
         }
@@ -47,9 +52,8 @@ class MessageBatchProcessor {
         String unwind = "UNWIND \$parms AS param " + statement
         Map parameters = ["parms": nodeParameters]
 
-        //Neo4J.run(driver, unwind, parameters)
-        Neo4J.executeStatementListInSession(List.of(unwind),driver.session(),parameters)
-        println("Done")
+        log.debug(unwind)
+        Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
     }
 
 }

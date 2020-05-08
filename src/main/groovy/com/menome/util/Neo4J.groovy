@@ -34,6 +34,13 @@ class Neo4J {
         return GraphDatabase.driver(boltURL, AuthTokens.basic("neo4j", "password"))
     }
 
+    static Driver openDriver() {
+        String boltPort = NEO4J_BOLT_API_PORT as String
+        String boltURL = "bolt://localhost:$boltPort"
+        return GraphDatabase.driver(boltURL, AuthTokens.basic("neo4j", "password"))
+    }
+
+
 
     static executeStatementListInSession(List<String> statements, Session session) {
         executeStatementListInSession(statements,session,[:])

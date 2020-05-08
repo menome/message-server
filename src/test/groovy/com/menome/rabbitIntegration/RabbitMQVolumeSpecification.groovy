@@ -3,7 +3,10 @@ package com.menome.rabbitIntegration
 import com.menome.MessagingSpecification
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.util.Neo4J
-import com.rabbitmq.client.*
+import com.rabbitmq.client.AMQP
+import com.rabbitmq.client.ConnectionFactory
+import com.rabbitmq.client.DefaultConsumer
+import com.rabbitmq.client.Envelope
 import com.rabbitmq.client.impl.MicrometerMetricsCollector
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.neo4j.driver.Driver
@@ -11,7 +14,6 @@ import org.neo4j.driver.Session
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
-import org.testcontainers.containers.Network
 import spock.lang.Shared
 
 import java.text.SimpleDateFormat
@@ -41,44 +43,10 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
     Driver neo4JDriver
 
 
-    protected static ConnectionFactory createRabbitConnectionFactory(GenericContainer rabbitMQContainer) {
-        ConnectionFactory rabbitConnectionFactory = new ConnectionFactory()
-        rabbitConnectionFactory.host = rabbitMQContainer.containerIpAddress
-        rabbitConnectionFactory.port = rabbitMQContainer.getMappedPort(RABBITMQ_PORT)
-        rabbitConnectionFactory.username = "menome"
-        rabbitConnectionFactory.password = "menome"
-
-        return rabbitConnectionFactory
-    }
-
-    protected static ConnectionFactory createRabbitConnectionFactory() {
-        ConnectionFactory rabbitConnectionFactory = new ConnectionFactory()
-        rabbitConnectionFactory.host = "127.0.0.1"
-        rabbitConnectionFactory.port = RABBITMQ_PORT
-        rabbitConnectionFactory.username = "menome"
-        rabbitConnectionFactory.password = "menome"
-
-        return rabbitConnectionFactory
-    }
-
-    protected static Channel openRabbitMQChanel(GenericContainer rabbitMQContainer, String queue, String exchange, String routingKey) {
-
-        Connection rabbitConnection = rabbitConnectionFactory.newConnection()
-        Channel rabbitChannel = rabbitConnection.createChannel()
-        rabbitChannel.queueDeclare(queue, true, false, false, null)
-        rabbitChannel.exchangeDeclare(exchange, "topic", true)
-        rabbitChannel.queueBind(queue, exchange, routingKey)
-
-        return rabbitChannel
-    }
-
     def setupSpec() {
-        //rabbitMQContainer = createAndStartRabbitMQContainer(Network.newNetwork())
         rabbitConnectionFactory = createRabbitConnectionFactory()
         metrics = new MicrometerMetricsCollector(new SimpleMeterRegistry())
         rabbitConnectionFactory.setMetricsCollector(metrics)
-        neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork())
-        neo4JDriver = Neo4J.openDriver(neo4JContainer)
     }
 
     def "write for server"() {
@@ -88,7 +56,7 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         rabbitConnectionFactory.setMetricsCollector(metrics)
 
         def rabbitChannel = openRabbitMQChanel(null, RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY)
-        def messagesToWrite = 50
+        def messagesToWrite = 1_000_000
         when:
         (1..messagesToWrite).each { it ->
             String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
@@ -99,7 +67,6 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         then:
         1 == 1
         println("Done...")
-        sleep(1000000000)
     }
 
     def "write 5000 messages to rabbit"() {
