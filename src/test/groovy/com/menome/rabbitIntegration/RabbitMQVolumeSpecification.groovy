@@ -55,8 +55,8 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         metrics = new MicrometerMetricsCollector(new SimpleMeterRegistry())
         rabbitConnectionFactory.setMetricsCollector(metrics)
 
-        def rabbitChannel = openRabbitMQChanel(null, RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY)
-        def messagesToWrite = 1_000_000
+        def rabbitChannel = openRabbitMQChanel(RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY,rabbitConnectionFactory)
+        def messagesToWrite = 20_000
         when:
         (1..messagesToWrite).each { it ->
             String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
@@ -71,7 +71,7 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
 
     def "write 5000 messages to rabbit"() {
         given:
-        def rabbitChannel = openRabbitMQChanel(rabbitMQContainer, RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY)
+        def rabbitChannel = openRabbitMQChanel(RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY,rabbitConnectionFactory)
         when:
 
 

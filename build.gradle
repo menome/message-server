@@ -36,6 +36,8 @@ dependencies {
     compile "org.testcontainers:spock:1.12.3"
 
     compile group: 'io.projectreactor.rabbitmq', name: 'reactor-rabbitmq', version: '1.4.1.RELEASE'
+    testCompile group: 'io.projectreactor', name: 'reactor-test', version: '3.3.5.RELEASE'
+
 
     //compile "org.testcontainers:neo4j:1.12.3"
 

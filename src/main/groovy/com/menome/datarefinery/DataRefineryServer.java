@@ -9,12 +9,15 @@ import org.neo4j.driver.Driver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
 import reactor.rabbitmq.RabbitFlux;
 import reactor.rabbitmq.Receiver;
 import reactor.rabbitmq.ReceiverOptions;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -31,11 +34,11 @@ public class DataRefineryServer {
     static ExecutorService executor = Executors.newFixedThreadPool(10);
     static Logger log = LoggerFactory.getLogger(DataRefineryServer.class);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         startServer();
     }
 
-    public static void startServer() {
+    public static void startServer() throws InterruptedException {
         log.info("Starting Server...");
 
         ConnectionFactory rabbitConnectionFactory = createRabbitConnectionFactory();
@@ -53,12 +56,55 @@ public class DataRefineryServer {
             e.printStackTrace();
         }
 
+        CountDownLatch latch = new CountDownLatch(1);
+
         Receiver rabbitReceiver = RabbitFlux.createReceiver(receiverOptions);
-        consume(executor, rabbitReceiver, driver);
+        int BATCH_SIZE = 5_000;
+        Flux<List<Delivery>> listFlux = rabbitReceiver.consumeAutoAck(RABBITMQ_QUEUE_NAME)
+                .bufferTimeout(BATCH_SIZE, Duration.ofSeconds(2))
+                .map(deliveries -> {
+                    log.debug("Deliveries size:" + deliveries.size());
+                    List<String> messages = new ArrayList<>();
+                    for (Delivery delivery : deliveries) {
+                        String message = new String(delivery.getBody());
+                        log.debug("delivery = " + message);
+                        messages.add(message);
+                    }
+                    if (messages.size() > 0) {
+                        long start = System.nanoTime();
+                        MessageBatchProcessor.process(messages, driver, false);
+                        long finish = System.nanoTime();
+                        log.info("elapsed = " + (finish - start) / 1000000);
+                    }
+                    return deliveries;
+                });
+
+        Disposable subscribe = listFlux.subscribe();
+
+        Runnable shutdown = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    latch.await();
+                    subscribe.dispose();
+                    rabbitReceiver.close();
+                    executor.shutdown();
+                    log.info("Server Stopped");
+                } catch (InterruptedException e) {
+                    log.error(e.getMessage());
+                }
+
+            }
+        };
+
+        executor.submit(shutdown);
+
         log.info("Server Started");
+
     }
 
     public static void stopServer() {
+
         executor.shutdown();
         log.info("Server Shutdown");
 
@@ -83,11 +129,6 @@ public class DataRefineryServer {
 
                     List<String> messages = new ArrayList<>();
 
-                    private boolean purgeCheck(){
-
-                        return true;
-                    }
-
                     @Override
                     public void accept(Delivery delivery) {
                         counter++;
@@ -95,7 +136,7 @@ public class DataRefineryServer {
                         messages.add(message);
                         log.debug(message);
                         //todo Make the batch size configurable
-                        if (counter == 5000 || purgeCheck()) {
+                        if (counter == 5000) {
                             counter = 0;
                             List<String> messageBatch = new ArrayList<>(messages);
                             //Task task = new Task(driver, messageBatch);
