@@ -37,14 +37,15 @@ class MessageBatchProcessor {
         List<Map<String, String>> nodeParameters = []
         messages.each() { String message ->
             def map = MessageProcessor.processPrimaryNodeParametersAsMap(message)
-            map.put("officeCity", "Victoria")
-            map.put("projectCode", "5")
-            map.put("teamCode", "1337")
-            //map.putAll(MessageProcessor.processParameterForConnections(message))
+            Map<String, Map<String, String>> conformedDimensionsMap = MessageProcessor.processParameterForConnections(message)
+            conformedDimensionsMap.each { dimensionKey, dimensionList ->
+                dimensionList.each { dimension, dimensionParameter ->
+                    map.put((dimensionKey + dimension), dimensionParameter)
+                }
+            }
             nodeParameters.addAll(map)
         }
 
-        //todo: Need to collect up all unique primary node merges and run them with their parms in threads
         String statement = ""
         statementMap.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE).each() { String statementFragment ->
             statement += statementFragment + "\n"

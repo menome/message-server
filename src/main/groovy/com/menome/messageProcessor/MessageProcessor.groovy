@@ -48,7 +48,7 @@ class MessageProcessor {
         }
     }
 
-    static Map<String, String> processParameterForConnections(String msg) {
+    static Map<String, Map<String,String>> processParameterForConnections(String msg) {
         if (msg) {
             processParameterForConnections(buildJSonParserFromMessage(msg))
         }
@@ -79,8 +79,8 @@ class MessageProcessor {
     }
 
 
-    static Map<String, String> processParameterForConnections(Map msgMap) {
-        Map<String, String> paramMap = [:]
+    static Map<String, Map<String,String>> processParameterForConnections(Map msgMap) {
+        Map<String, Map<String,String>> paramMap = [:]
         msgMap.Connections.each() {
             Map connectionMap = [:]
             connectionMap.putAll(it)
