@@ -3,6 +3,7 @@ package com.menome.messageBatchProcessor
 
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.util.Neo4J
+import org.apache.commons.lang3.time.StopWatch
 import org.neo4j.driver.Driver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -11,9 +12,13 @@ class MessageBatchProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
 
-    static String process(List<String> messages, Driver driver, boolean createIndexes) {
+    static List<String> process(List<String> messages, Driver driver, boolean createIndexes) {
         HashSet indexes = []
         HashSet connectionMerges = []
+
+        log.info(Thread.currentThread().getName() + " " + messages.size());
+        StopWatch timer = new StopWatch();
+        timer.start();
 
         // Todo this is wrong. We need to collect up all the unique indexes and conformed dimension merge parameters for the entire set not just the first entry
         Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(messages.get(0))
@@ -55,6 +60,10 @@ class MessageBatchProcessor {
 
         log.debug(unwind)
         Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
+        timer.stop();
+        log.info("elapsed = " + timer.formatTime());
+
+        return messages;
     }
 
 }
