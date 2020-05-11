@@ -58,9 +58,9 @@ class MessagingSpecification extends Specification {
                 .toJSON()
     }
 
-    protected static alice = Connection.builder().Name("Alice").NodeType("AdvisoryBoardMember1").RelType("Organizer").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
-    protected static bob = Connection.builder().Name("Bob").NodeType("AdvisoryBoardMember2").RelType("Participant").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
-    protected static charlie = Connection.builder().Name("Charlie").NodeType("AdvisoryBoardMember3").RelType("Participant").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
+    protected static alice = Connection.builder().Name("Alice").NodeType("AdvisoryBoardMember").RelType("Organizer").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
+    protected static bob = Connection.builder().Name("Bob").NodeType("AdvisoryBoardMember").RelType("Participant").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
+    protected static charlie = Connection.builder().Name("Charlie").NodeType("AdvisoryBoardMember").RelType("Participant").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
     protected static String meetingMessageWithConnections = MessageBuilder.builder()
             .Name("Advisory Board Meeting")
             .NodeType("Meeting")

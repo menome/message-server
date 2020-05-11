@@ -37,8 +37,6 @@ class MessageBatchProcessor {
             }
         }
 
-        println messagesByNodeType
-
         messagesByNodeType.each { nodeType, msgs ->
             Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(msgs.get(0))
             processIndexes(msgs, createIndexes, driver)

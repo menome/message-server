@@ -100,9 +100,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
         expect:
         mergeStatements.size() == 3
-        officeNode == "MERGE (office:Office{City: param.City}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name= param.Name ON MATCH SET office.Name= param.Name"
-        projectNode == "MERGE (project:Project{Code: param.Code}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.Name= param.Name ON MATCH SET project.Name= param.Name"
-        teamNode == "MERGE (team:Team{Code: param.Code}) ON CREATE SET team.Uuid = apoc.create.uuid(),team.TheLinkAddedDate = datetime(), team.Label= param.Label,team.Name= param.Name ON MATCH SET team.Label= param.Label,team.Name= param.Name"
+        officeNode == "MERGE (office0:Office{City: param.City}) ON CREATE SET office0.Uuid = apoc.create.uuid(),office0.TheLinkAddedDate = datetime(), office0.Name= param.Name ON MATCH SET office0.Name= param.Name"
+        projectNode == "MERGE (project1:Project{Code: param.Code}) ON CREATE SET project1.Uuid = apoc.create.uuid(),project1.TheLinkAddedDate = datetime(), project1.Name= param.Name ON MATCH SET project1.Name= param.Name"
+        teamNode == "MERGE (team2:Team{Code: param.Code}) ON CREATE SET team2.Uuid = apoc.create.uuid(),team2.TheLinkAddedDate = datetime(), team2.Label= param.Label,team2.Name= param.Name ON MATCH SET team2.Label= param.Label,team2.Name= param.Name"
 
     }
 
@@ -115,9 +115,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
         expect:
         // We should have One Office, One Project and One Team
         connectionStatements.size() == 3
-        officeNode == "MATCH (office:Office {City : param.officeCity}) WITH employee,param,office"
-        projectNode == "MATCH (project:Project {Code : param.projectCode}) WITH employee,param,office,project"
-        teamNode == "MATCH (team:Team {Code : param.teamCode}) WITH employee,param,office,project,team"
+        officeNode == "MATCH (office0:Office {City : param.office0City}) WITH employee,param,office0"
+        projectNode == "MATCH (project1:Project {Code : param.project1Code}) WITH employee,param,office0,project1"
+        teamNode == "MATCH (team2:Team {Code : param.team2Code}) WITH employee,param,office0,project1,team2"
     }
 
     def "process connection relationships from connection message"() {
@@ -127,9 +127,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
         String projectNode = getStatementFromList(connectionStatements, ":WorkedOnProject")
         String teamNode = getStatementFromList(connectionStatements, ":HAS_FACET")
         expect:
-        officeNode == "MERGE (employee)-[office_rel:LocatedInOffice]->(office)"
-        projectNode == "MERGE (employee)-[project_rel:WorkedOnProject]->(project)"
-        teamNode == "MERGE (employee)-[team_rel:HAS_FACET]->(team)"
+        officeNode == "MERGE (employee)-[office0_rel:LocatedInOffice]->(office0)"
+        projectNode == "MERGE (employee)-[project1_rel:WorkedOnProject]->(project1)"
+        teamNode == "MERGE (employee)-[team2_rel:HAS_FACET]->(team2)"
     }
 
     def "check all statement types"() {
@@ -149,7 +149,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(employeeMessageWithConnections)
         expect:
         parms == [Status:"active", Email:"konrad.aust@menome.com", Priority:1.0, PreferredName:"The Chazzinator", EmployeeId:12345.0, SourceSystem:"HRSystem", ResumeSkills:"programming,peeling bananas from the wrong end,handstands,sweet kickflips", Name:"Konrad Aust"]
-        connectionParms == [office: [Name: "Menome Victoria", NodeType: "Office", RelType: "LocatedInOffice", ForwardRel: true, City: "Victoria"], project: [Name: "theLink", NodeType: "Project", RelType: "WorkedOnProject", ForwardRel: true, Code: "5"], team: [Name: "theLink Product Team", NodeType: "Team", Label: "Facet", RelType: "HAS_FACET", ForwardRel: true, Code: "1337"]]
+        connectionParms == [office0: [Name: "Menome Victoria", NodeType: "Office", RelType: "LocatedInOffice", ForwardRel: true, City: "Victoria"], project1: [Name: "theLink", NodeType: "Project", RelType: "WorkedOnProject", ForwardRel: true, Code: "5"], team2: [Name: "theLink Product Team", NodeType: "Team", Label: "Facet", RelType: "HAS_FACET", ForwardRel: true, Code: "1337"]]
     }
 
     def "check deriveMessageTypeFromStatement"() {
@@ -164,7 +164,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         String officeMerge = "MERGE (office:Office{City: param.City}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name= param.Name ON MATCH SET office.Name= param.Name"
         Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(employeeMessageWithConnections)
-        String nodeType = MessageProcessor.deriveMessageTypeFromStatement(officeMerge)
+        String nodeType = MessageProcessor.deriveMessageTypeFromStatement(officeMerge) + "0"
         expect:
         Map officeParms = connectionParms[nodeType]
         officeParms.size() == 5
@@ -179,7 +179,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         String officeMatch = "MATCH (office:Office {City : param.City}) WITH employee,office"
         Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(employeeMessageWithConnections)
-        String nodeType = MessageProcessor.deriveMessageTypeFromStatement(officeMatch)
+        String nodeType = MessageProcessor.deriveMessageTypeFromStatement(officeMatch) + "0"
         expect:
         Map officeParms = connectionParms[nodeType]
         officeParms.size() == 5
@@ -195,27 +195,35 @@ class MessageProcessorSpecification extends MessagingSpecification {
         Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(employeeMessageWithConnections)
         expect:
         connectionParms.size() == 3
-        connectionParms.office
-        connectionParms.project
-        connectionParms.team
+        connectionParms.office0
+        connectionParms.project1
+        connectionParms.team2
 
-        connectionParms.office.Name == "Menome Victoria"
-        connectionParms.office.NodeType == "Office"
-        connectionParms.office.RelType == "LocatedInOffice"
-        connectionParms.office.ForwardRel == Boolean.TRUE
-        connectionParms.office.City == "Victoria"
+        connectionParms.office0.Name == "Menome Victoria"
+        connectionParms.office0.NodeType == "Office"
+        connectionParms.office0.RelType == "LocatedInOffice"
+        connectionParms.office0.ForwardRel == Boolean.TRUE
+        connectionParms.office0.City == "Victoria"
 
-        connectionParms.project.Name == "theLink"
-        connectionParms.project.NodeType == "Project"
-        connectionParms.project.RelType == "WorkedOnProject"
-        connectionParms.project.ForwardRel == Boolean.TRUE
-        connectionParms.project.Code == "5"
+        connectionParms.project1.Name == "theLink"
+        connectionParms.project1.NodeType == "Project"
+        connectionParms.project1.RelType == "WorkedOnProject"
+        connectionParms.project1.ForwardRel == Boolean.TRUE
+        connectionParms.project1.Code == "5"
 
-        connectionParms.team.Name == "theLink Product Team"
-        connectionParms.team.NodeType == "Team"
-        connectionParms.team.RelType == "HAS_FACET"
-        connectionParms.team.ForwardRel == Boolean.TRUE
-        connectionParms.team.Code == "1337"
+        connectionParms.team2.Name == "theLink Product Team"
+        connectionParms.team2.NodeType == "Team"
+        connectionParms.team2.RelType == "HAS_FACET"
+        connectionParms.team2.ForwardRel == Boolean.TRUE
+        connectionParms.team2.Code == "1337"
+    }
+
+    def "allow relationships with the same type within the message"(){
+        given:
+        def results = MessageProcessor.process(meetingMessageWithConnections)
+        def primaryNodeMerge = results[MessageProcessor.StatementType.PRIMARY_NODE_MERGE]
+        expect:
+        1==1
     }
 
 }
