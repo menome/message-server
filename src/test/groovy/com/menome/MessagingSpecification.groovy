@@ -12,6 +12,8 @@ import org.testcontainers.containers.Network
 import spock.lang.Specification
 
 import java.time.Duration
+import java.time.LocalDateTime
+import java.time.Month
 
 class MessagingSpecification extends Specification {
 
@@ -41,29 +43,44 @@ class MessagingSpecification extends Specification {
     protected static project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
     protected static team = Connection.builder().Name("theLink Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
 
-    protected static String messageWithConnections = MessageBuilder.builder()
-            .Name("Konrad Aust")
-            .NodeType("Employee")
-            .Priority(1)
-            .SourceSystem("HRSystem")
-            .ConformedDimensions("Email": "konrad.aust@menome.com", "EmployeeId": 12345)
-            .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
-            .Connections([office, project, team])
-            .build()
-            .toJSON()
+    protected static String employeeMessageWithConnections = buildEmployeeMessageWithConnections(false)
 
-    protected static List<String> threeMessageBatch = (1..3).collect() {
+    private static String buildEmployeeMessageWithConnections(boolean generateUniqeId) {
         MessageBuilder.builder()
                 .Name("Konrad Aust")
                 .NodeType("Employee")
                 .Priority(1)
                 .SourceSystem("HRSystem")
-                .ConformedDimensions("Email": "konrad.aust" + it + "@menome.com", "EmployeeId": 12345)
+                .ConformedDimensions("Email": "konrad.aust" + (generateUniqeId ? UUID.randomUUID() : "") + "@menome.com", "EmployeeId": 12345)
                 .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
                 .Connections([office, project, team])
                 .build()
                 .toJSON()
     }
+
+    protected static alice = Connection.builder().Name("Alice").NodeType("AdvisoryBoardMember1").RelType("Organizer").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
+    protected static bob = Connection.builder().Name("Bob").NodeType("AdvisoryBoardMember2").RelType("Participant").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
+    protected static charlie = Connection.builder().Name("Charlie").NodeType("AdvisoryBoardMember3").RelType("Participant").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
+    protected static String meetingMessageWithConnections = MessageBuilder.builder()
+            .Name("Advisory Board Meeting")
+            .NodeType("Meeting")
+            .Priority(1)
+            .SourceSystem("Outlook")
+            .ConformedDimensions("MeetingId": UUID.randomUUID())
+            .Properties(["Status": "active", "Location": "Boardroom", "ScheduledDate": LocalDateTime.of(2020, Month.JANUARY, 25, 9, 30).toString()])
+            .Connections([alice, bob, charlie])
+            .build()
+            .toJSON()
+
+
+    protected static List<String> threeMessageBatch = (1..3).collect() {
+        buildEmployeeMessageWithConnections(true)
+    }
+
+    protected static List<String> twoMessagesDifferentTypeBatch = [
+            employeeMessageWithConnections,
+            meetingMessageWithConnections]
+
 
     protected static List<String> fiveThousandMessageBatch = (1..5000).collect() {
         MessageBuilder.builder()
@@ -123,7 +140,7 @@ class MessagingSpecification extends Specification {
         return rabbitMQContainer
     }
 
-    protected static Channel openRabbitMQChanel(String queue, String exchange, String routingKey,ConnectionFactory rabbitConnectionFactory) {
+    protected static Channel openRabbitMQChanel(String queue, String exchange, String routingKey, ConnectionFactory rabbitConnectionFactory) {
 
         com.rabbitmq.client.Connection rabbitConnection = rabbitConnectionFactory.newConnection()
         Channel rabbitChannel = rabbitConnection.createChannel()
@@ -133,4 +150,5 @@ class MessagingSpecification extends Specification {
 
         return rabbitChannel
     }
+
 }

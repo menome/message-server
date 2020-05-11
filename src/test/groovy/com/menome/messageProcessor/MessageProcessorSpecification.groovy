@@ -15,19 +15,19 @@ class MessageProcessorSpecification extends MessagingSpecification {
     }
 
     List<String> processPrimaryNodeMergeForMessageWithConnections() {
-        return processMessage(messageWithConnections, MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
+        return processMessage(employeeMessageWithConnections, MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
     }
 
     List<String> processIndexesForMessageWithConnections() {
-        return processMessage(messageWithConnections, MessageProcessor.StatementType.INDEXES)
+        return processMessage(employeeMessageWithConnections, MessageProcessor.StatementType.INDEXES)
     }
 
     List<String> processConnectionMergesMessageWithConnections() {
-        return processMessage(messageWithConnections, MessageProcessor.StatementType.CONNECTION_MERGE)
+        return processMessage(employeeMessageWithConnections, MessageProcessor.StatementType.CONNECTION_MERGE)
     }
 
     List<String> processConnectionMatchesMessageWithConnections() {
-        return processMessage(messageWithConnections, MessageProcessor.StatementType.CONNECTION_MATCH)
+        return processMessage(employeeMessageWithConnections, MessageProcessor.StatementType.CONNECTION_MATCH)
     }
 
 
@@ -136,7 +136,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         MessageProcessor processor = new MessageProcessor()
         when:
-        Map<MessageProcessor.StatementType, List<String>> process = processor.process(messageWithConnections)
+        Map<MessageProcessor.StatementType, List<String>> process = processor.process(employeeMessageWithConnections)
         then:
         process.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE).size() == 7
         process.get(MessageProcessor.StatementType.INDEXES).size() == 2
@@ -145,8 +145,8 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process parameter"() {
         given:
-        Map<String,String> parms = MessageProcessor.processPrimaryNodeParametersAsMap(messageWithConnections)
-        Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(messageWithConnections)
+        Map<String,String> parms = MessageProcessor.processPrimaryNodeParametersAsMap(employeeMessageWithConnections)
+        Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(employeeMessageWithConnections)
         expect:
         parms == [Status:"active", Email:"konrad.aust@menome.com", Priority:1.0, PreferredName:"The Chazzinator", EmployeeId:12345.0, SourceSystem:"HRSystem", ResumeSkills:"programming,peeling bananas from the wrong end,handstands,sweet kickflips", Name:"Konrad Aust"]
         connectionParms == [office: [Name: "Menome Victoria", NodeType: "Office", RelType: "LocatedInOffice", ForwardRel: true, City: "Victoria"], project: [Name: "theLink", NodeType: "Project", RelType: "WorkedOnProject", ForwardRel: true, Code: "5"], team: [Name: "theLink Product Team", NodeType: "Team", Label: "Facet", RelType: "HAS_FACET", ForwardRel: true, Code: "1337"]]
@@ -163,7 +163,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
     def "check parameters for office conformed dimension - merge"() {
         given:
         String officeMerge = "MERGE (office:Office{City: param.City}) ON CREATE SET office.Uuid = apoc.create.uuid(),office.TheLinkAddedDate = datetime(), office.Name= param.Name ON MATCH SET office.Name= param.Name"
-        Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(messageWithConnections)
+        Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(employeeMessageWithConnections)
         String nodeType = MessageProcessor.deriveMessageTypeFromStatement(officeMerge)
         expect:
         Map officeParms = connectionParms[nodeType]
@@ -178,7 +178,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
     def "check parameters for office conformed dimension - match"() {
         given:
         String officeMatch = "MATCH (office:Office {City : param.City}) WITH employee,office"
-        Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(messageWithConnections)
+        Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(employeeMessageWithConnections)
         String nodeType = MessageProcessor.deriveMessageTypeFromStatement(officeMatch)
         expect:
         Map officeParms = connectionParms[nodeType]
@@ -192,7 +192,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "check all parameters"() {
         given:
-        Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(messageWithConnections)
+        Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(employeeMessageWithConnections)
         expect:
         connectionParms.size() == 3
         connectionParms.office

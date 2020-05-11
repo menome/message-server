@@ -1,6 +1,7 @@
 package com.menome.messageBatchProcessor
 
-
+import com.menome.errorHandler.ErrorHandlerHelper
+import com.menome.messageProcessor.InvalidMessageException
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.util.Neo4J
 import org.apache.commons.lang3.time.StopWatch
@@ -18,15 +19,36 @@ class MessageBatchProcessor {
         StopWatch timer = new StopWatch();
         timer.start();
 
-        Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(messages.get(0))
+        List<Tuple2<String,String>> errors = []
 
-        processIndexes(messages, createIndexes, driver)
-        processConnectionMerges(messages, statementMap, driver)
-        processPrimaryNodeMerges(messages, statementMap, driver)
-        timer.stop();
-        log.info("elapsed = " + timer.formatTime());
+        Map <String,List<String>> messagesByNodeType = [:]
+        messages.each() { String jsonMessage ->
+            def msg = MessageProcessor.buildMapFromJSONString(jsonMessage)
+            String nodeType = msg.NodeType
+            if (nodeType) {
+                List<String> messageList = messagesByNodeType.get(nodeType)
+                if (!messageList) {
+                    messageList = []
+                }
+                messageList.add(jsonMessage)
+                messagesByNodeType.put(nodeType, messageList)
+            } else {
+                errors.add(ErrorHandlerHelper.toTupple(new InvalidMessageException("Missing NodeType"), jsonMessage))
+            }
+        }
 
-        return messages;
+        println messagesByNodeType
+
+        messagesByNodeType.each { nodeType, msgs ->
+            Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(msgs.get(0))
+            processIndexes(msgs, createIndexes, driver)
+            processConnectionMerges(msgs, statementMap, driver)
+            processPrimaryNodeMerges(msgs, statementMap, driver)
+        }
+        timer.stop()
+        log.info("elapsed = " + timer.formatTime())
+
+        return messages
     }
 
     private static void processPrimaryNodeMerges(List<String> messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {

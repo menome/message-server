@@ -18,7 +18,7 @@ class MessageProcessor {
     static Map<StatementType, List<String>> process(String msg) {
         Map<StatementType, List<String>> typesOfStatements = [:]
         if (msg) {
-            def msgMap = buildJSonParserFromMessage(msg)
+            def msgMap = buildMapFromJSONString(msg)
             typesOfStatements.put(StatementType.PRIMARY_NODE_MERGE, processPrimaryNodeMerge(msgMap))
             typesOfStatements.put(StatementType.INDEXES, processIndexes(msgMap))
             typesOfStatements.put(StatementType.CONNECTION_MERGE, processConnectionMerges(msgMap))
@@ -38,23 +38,23 @@ class MessageProcessor {
 
     static Map<String,String> processPrimaryNodeParametersAsMap(String msg) {
         if (msg) {
-            processPrimaryNodeParametersAsMap(buildJSonParserFromMessage(msg))
+            processPrimaryNodeParametersAsMap(buildMapFromJSONString(msg))
         }
     }
 
     static String processPrimaryNodeParametersAsJSON(String msg) {
         if (msg) {
-            new Gson().toJson(processPrimaryNodeParametersAsMap(buildJSonParserFromMessage(msg)))
+            new Gson().toJson(processPrimaryNodeParametersAsMap(buildMapFromJSONString(msg)))
         }
     }
 
     static Map<String, Map<String,String>> processParameterForConnections(String msg) {
         if (msg) {
-            processParameterForConnections(buildJSonParserFromMessage(msg))
+            processParameterForConnections(buildMapFromJSONString(msg))
         }
     }
 
-    private static Map buildJSonParserFromMessage(String msg) {
+     static Map buildMapFromJSONString(String msg) {
         Gson gson = new Gson()
         Map msgMap = gson.fromJson(msg, Map.class)
         msgMap

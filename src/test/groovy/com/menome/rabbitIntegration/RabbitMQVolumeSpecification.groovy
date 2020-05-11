@@ -59,7 +59,7 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         def messagesToWrite = 200_000
         when:
         (1..messagesToWrite).each { it ->
-            String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust${UUID.randomUUID()}@menome.com")
+            String message = employeeMessageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust${UUID.randomUUID()}@menome.com")
 
             //println "Publishing:$message"
             rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
@@ -86,7 +86,7 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         int messagesToCreate = 50
         println("Creating $messagesToCreate")
         (1..messagesToCreate).each { it ->
-            String message = messageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
+            String message = employeeMessageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
             rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
         }
 
