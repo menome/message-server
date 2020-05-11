@@ -13,32 +13,23 @@ class MessageBatchProcessor {
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
 
     static List<String> process(List<String> messages, Driver driver, boolean createIndexes) {
-        HashSet indexes = []
-        HashSet connectionMerges = []
 
         log.info(Thread.currentThread().getName() + " " + messages.size());
         StopWatch timer = new StopWatch();
         timer.start();
 
-        // Todo this is wrong. We need to collect up all the unique indexes and conformed dimension merge parameters for the entire set not just the first entry
         Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(messages.get(0))
-        indexes.addAll(statementMap.get(MessageProcessor.StatementType.INDEXES))
-        connectionMerges.addAll(statementMap.get(MessageProcessor.StatementType.CONNECTION_MERGE))
-        Map params = MessageProcessor.processParameterForConnections(messages.get(0))
 
-        //RETURN apoc.schema.node.indexExists("Card", ["Email","EmployeeId"])
-        if (createIndexes) {
-            Neo4J.run(driver, statementMap.get(MessageProcessor.StatementType.INDEXES), [:])
-        }
+        processIndexes(messages, createIndexes, driver)
+        processConnectionMerges(messages, statementMap, driver)
+        processPrimaryNodeMerges(messages, statementMap, driver)
+        timer.stop();
+        log.info("elapsed = " + timer.formatTime());
 
-        connectionMerges.each() {
-            String key = MessageProcessor.deriveMessageTypeFromStatement(it)
-            Map confirmedDimensionParms = params.get(key)
-            String unwind = "UNWIND \$parms AS param " + it
-            Map parameters = ["parms": List.of(confirmedDimensionParms)]
-            Neo4J.run(driver, unwind, parameters)
-        }
+        return messages;
+    }
 
+    private static void processPrimaryNodeMerges(List<String> messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
         List<Map<String, String>> nodeParameters = []
         messages.each() { String message ->
             def map = MessageProcessor.processPrimaryNodeParametersAsMap(message)
@@ -60,10 +51,35 @@ class MessageBatchProcessor {
 
         log.debug(unwind)
         Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
-        timer.stop();
-        log.info("elapsed = " + timer.formatTime());
+    }
 
-        return messages;
+    private static List<Object> processConnectionMerges(List messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
+
+        Map params = MessageProcessor.processParameterForConnections(messages.get(0))
+        def connectionMerges = new HashSet()
+        connectionMerges.addAll(statementMap.get(MessageProcessor.StatementType.CONNECTION_MERGE))
+
+        def list = new ArrayList(connectionMerges)
+
+        list.each() {
+            String key = MessageProcessor.deriveMessageTypeFromStatement(it)
+            Map confirmedDimensionParms = params.get(key)
+            String unwind = "UNWIND \$parms AS param " + it
+            Map parameters = ["parms": List.of(confirmedDimensionParms)]
+            Neo4J.run(driver, unwind, parameters)
+        }
+    }
+
+    private static void processIndexes(List<String> messages, boolean createIndexes, Driver driver) {
+// Todo this is wrong. We need to collect up all the unique indexes and conformed dimension merge parameters for the entire set not just the first entry
+
+        Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(messages.get(0))
+        def indexes = statementMap.get(MessageProcessor.StatementType.INDEXES)
+
+        //RETURN apoc.schema.node.indexExists("Card", ["Email","EmployeeId"])
+        if (createIndexes) {
+            Neo4J.run(driver, indexes, [:])
+        }
     }
 
 }

@@ -4,7 +4,6 @@ import com.menome.MessagingSpecification
 import com.menome.util.Neo4J
 import org.neo4j.driver.Driver
 import org.testcontainers.containers.GenericContainer
-import org.testcontainers.containers.Network
 import spock.lang.Shared
 
 import java.time.Duration
@@ -14,18 +13,19 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
     @Shared
     GenericContainer neo4JContainer
 
-    def xsetup() {
-        neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork())
+    def setup() {
+        //neo4JContainer = createAndStartNeo4JContainer(Network.newNetwork())
+        Neo4J.run(Neo4J.openDriver(),"match (n) detach delete n")
     }
 
     def "three messages comparing full batch script"() {
         given:
         List<String> threeMessageBatch = threeMessageBatch
         Driver driver = Neo4J.openDriver()
-        MessageBatchProcessor.process(threeMessageBatch, driver,false)
+        MessageBatchProcessor.process(threeMessageBatch, driver, false)
         expect:
-        1 == 1
-
+        def result = Neo4J.run(driver, "match (e:Employee) return count(e) as count")
+        3 == result.single().get("count").asInt()
     }
 
     def "five hundred messages comparing full batch script"() {
@@ -41,7 +41,6 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         println("Finished $end")
         expect:
         1 == 1
-
     }
 
 }
