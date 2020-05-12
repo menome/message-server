@@ -83,9 +83,11 @@ class MessageBatchProcessor {
             Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
         } catch (Exception e){
             if (messages.size() > 1){
-                messages.each(){message->
-                    Map<MessageProcessor.StatementType, List<String>> typeListMap = MessageProcessor.process(message)
-                    return processPrimaryNodeMerges(List.of(message),typeListMap,driver)
+                List<String> segments = messages.collate(messages.size().intdiv(2),true)
+                segments.each(){segmentMessages->
+                    Map<MessageProcessor.StatementType, List<String>> typeListMap = MessageProcessor.process(segmentMessages[0])
+                    errors.addAll(processPrimaryNodeMerges(segmentMessages,typeListMap,driver))
+                    return errors
                 }
             } else {
                 errors.add(ErrorHandlerHelper.toTupple(e,messages[0]))

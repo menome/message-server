@@ -45,7 +45,7 @@ class MessagingSpecification extends Specification {
 
     protected static String employeeMessageWithConnections = buildEmployeeMessageWithConnections(false)
 
-    private static String buildEmployeeMessageWithConnections(boolean generateUniqeId) {
+    protected static String buildEmployeeMessageWithConnections(boolean generateUniqeId) {
         MessageBuilder.builder()
                 .Name("Konrad Aust")
                 .NodeType("Employee")

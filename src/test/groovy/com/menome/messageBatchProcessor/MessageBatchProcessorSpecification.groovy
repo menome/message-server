@@ -3,17 +3,20 @@ package com.menome.messageBatchProcessor
 import com.menome.MessagingSpecification
 import com.menome.util.Neo4J
 import org.neo4j.driver.Driver
+import org.neo4j.driver.Record
+import org.neo4j.driver.Result
 
 import java.util.concurrent.TimeUnit
 
 import static org.awaitility.Awaitility.await
+import static org.awaitility.Awaitility.given
 
 class MessageBatchProcessorSpecification extends MessagingSpecification {
 
     def setup() {
         def driver = Neo4J.openDriver()
         Neo4J.run(driver, "match (n) detach delete n")
-        await().atMost(1, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0}
+        await().atMost(1, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0 }
     }
 
 
@@ -51,7 +54,7 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         1 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
     }
 
-    def "batch of three valid one invalid"(){
+    def "batch of three valid one invalid"() {
         given:
         Driver driver = Neo4J.openDriver()
         def messages = new ArrayList(threeMessageBatch)
@@ -61,11 +64,11 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         3 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
     }
 
-    def "batch of two valid one corrupted message"(){
+    def "batch of two valid one corrupted message"() {
         given:
         Driver driver = Neo4J.openDriver()
-        def corrupted = threeMessageBatch[0].replaceAll("SourceSystem","Source System")
-        def messages = List.of(corrupted,threeMessageBatch[1],threeMessageBatch[2])
+        def corrupted = threeMessageBatch[0].replaceAll("SourceSystem", "Source System")
+        def messages = List.of(corrupted, threeMessageBatch[1], threeMessageBatch[2])
         MessageBatchProcessor.process(messages, driver)
         expect:
         2 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
@@ -84,6 +87,29 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         0 == Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt()
     }
 
+    def "indexes created as expected from employee message"() {
+        given()
+        Driver driver = Neo4J.openDriver()
+        when:
+        MessageBatchProcessor.process(List.of(employeeMessageWithConnections), driver)
+        Result result = Neo4J.run(driver, "CALL db.indexes()")
+        List <Record> records = result.collect()
+        then:
+        checkIfIndexExistsInRecordSet(records, ["Employee"], ["Email", "EmployeeId"])
+        checkIfIndexExistsInRecordSet(records, ["Card"], ["Email", "EmployeeId"])
+    }
+
+    boolean checkIfIndexExistsInRecordSet(List<Record> records, List<String> label, List<String> properties) {
+        boolean rc = false;
+        records.each() { record ->
+            def map = record.asMap()
+            if (map.get("labelsOrTypes") == label && map.get("properties") == properties){
+                rc = true
+            }
+        }
+        return rc
+    }
+
 
     def "batch of three with status"() {
         given:
@@ -94,14 +120,29 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         then:
         results.first
         def status = results.first
-        status.each(){key,value->
+        status.each() { key, value ->
             log.info("$key $value")
         }
     }
 
+    def "seven messages with two errors"() {
+        given:
+        Driver driver = Neo4J.openDriver()
+        when:
+        def messages = (1..5).collect() {
+            buildEmployeeMessageWithConnections(true)
+        }
+        messages.add(invalidMessage)
+        messages.add(invalidMessage)
+        def results = MessageBatchProcessor.process(messages, driver)
+        then:
+        results.second.size() == 2
+        5 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+
+    }
+
 
     def "message with missing node type expect error tuple"() {
-
     }
 
     def "node types cant have spaces"() {
