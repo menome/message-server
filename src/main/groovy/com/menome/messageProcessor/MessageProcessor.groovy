@@ -137,7 +137,9 @@ class MessageProcessor {
         def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
         cardMerge += mergeExpression
         cardMerge += " ON MATCH SET " + mergeExpression
-        cardMerge += " WITH $nodeName,param "
+        if (msgMap.Connections) {
+            cardMerge += " WITH $nodeName,param "
+        }
         mergeStatements << cardMerge
     }
 

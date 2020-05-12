@@ -13,13 +13,14 @@ class MessageBatchProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
 
-    static List<String> process(List<String> messages, Driver driver) {
+    static Tuple2<Map,List<Tuple2>> process(List<String> messages, Driver driver) {
 
         log.info(Thread.currentThread().getName() + " " + messages.size());
         StopWatch timer = new StopWatch();
         timer.start();
 
         List<Tuple2<String, String>> errors = []
+        Map<String,String> batchStatus = [:]
 
         Map<String, List<String>> messagesByNodeType = [:]
         messages.each() { String jsonMessage ->
@@ -41,16 +42,18 @@ class MessageBatchProcessor {
             Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(msgs.get(0))
             processIndexes(msgs, driver)
             processConnectionMerges(msgs, statementMap, driver)
-            processPrimaryNodeMerges(msgs, statementMap, driver)
+            errors.addAll(processPrimaryNodeMerges(msgs, statementMap, driver))
         }
         timer.stop()
+
         log.info("elapsed = " + timer.formatTime())
 
-        return messages
+        return new Tuple2<Map, List<Tuple2>>(batchStatus,errors)
     }
 
-    private static void processPrimaryNodeMerges(List<String> messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
+    private static  List<Tuple2<String,String>> processPrimaryNodeMerges(List<String> messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
         List<Map<String, String>> nodeParameters = []
+        List<Tuple2<String,String>> errors = []
         messages.each() { String message ->
             def map = MessageProcessor.processPrimaryNodeParametersAsMap(message)
             Map<String, Map<String, String>> conformedDimensionsMap = MessageProcessor.processParameterForConnections(message)
@@ -69,8 +72,20 @@ class MessageBatchProcessor {
         String unwind = "UNWIND \$parms AS param " + statement
         Map parameters = ["parms": nodeParameters]
 
-        log.debug(unwind)
-        Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
+        log.info(unwind)
+        try {
+            Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
+        } catch (Exception e){
+            if (messages.size() > 1){
+                messages.each(){message->
+                    Map<MessageProcessor.StatementType, List<String>> typeListMap = MessageProcessor.process(message)
+                    return processPrimaryNodeMerges(List.of(message),typeListMap,driver)
+                }
+            } else {
+                errors.add(ErrorHandlerHelper.toTupple(e,messages[0]))
+            }
+        }
+        return errors;
     }
 
     private static List<Object> processConnectionMerges(List messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
@@ -100,7 +115,7 @@ class MessageBatchProcessor {
         // index to create this statement is more trouble than it's worth. We'll try to create them and let it fail
         indexes.each() { index ->
             try {
-                Neo4J.run(driver,index)
+                Neo4J.run(driver, index)
             } catch (Exception e) {
                 //nothing to do here as index already exists.
             }

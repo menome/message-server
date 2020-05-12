@@ -74,10 +74,10 @@ class MessagingSpecification extends Specification {
 
     protected static String invalidMessage = MessageBuilder.builder()
             .Name("Bad Message")
-            .NodeType("Invalid")
+            .NodeType("Invalid Node With Spaces")
             .Priority(1)
             .SourceSystem("Bad Actor")
-            .ConformedDimensions("Id": "-")
+            .ConformedDimensions("Id": 1)
             .Properties(["Status": "active"])
             .build()
             .toJSON()
