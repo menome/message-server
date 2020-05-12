@@ -38,7 +38,7 @@ public class DataRefineryServer {
         RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(RABBITMQ_QUEUE_NAME)
                 .map(rabbitMsg -> new String(rabbitMsg.getBody()))
                 .bufferTimeout(BATCH_SIZE, Duration.ofSeconds(2))
-                .map(messages->MessageBatchProcessor.process(messages,driver,false))
+                .map(messages->MessageBatchProcessor.process(messages,driver))
                 .subscribe();
 
         log.info("Server Started");

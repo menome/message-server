@@ -13,15 +13,15 @@ class MessageBatchProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
 
-    static List<String> process(List<String> messages, Driver driver, boolean createIndexes) {
+    static List<String> process(List<String> messages, Driver driver) {
 
         log.info(Thread.currentThread().getName() + " " + messages.size());
         StopWatch timer = new StopWatch();
         timer.start();
 
-        List<Tuple2<String,String>> errors = []
+        List<Tuple2<String, String>> errors = []
 
-        Map <String,List<String>> messagesByNodeType = [:]
+        Map<String, List<String>> messagesByNodeType = [:]
         messages.each() { String jsonMessage ->
             def msg = MessageProcessor.buildMapFromJSONString(jsonMessage)
             String nodeType = msg.NodeType
@@ -39,7 +39,7 @@ class MessageBatchProcessor {
 
         messagesByNodeType.each { nodeType, msgs ->
             Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(msgs.get(0))
-            processIndexes(msgs, createIndexes, driver)
+            processIndexes(msgs, driver)
             processConnectionMerges(msgs, statementMap, driver)
             processPrimaryNodeMerges(msgs, statementMap, driver)
         }
@@ -90,16 +90,23 @@ class MessageBatchProcessor {
         }
     }
 
-    private static void processIndexes(List<String> messages, boolean createIndexes, Driver driver) {
-// Todo this is wrong. We need to collect up all the unique indexes and conformed dimension merge parameters for the entire set not just the first entry
+    private static void processIndexes(List<String> messages, Driver driver) {
 
         Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(messages.get(0))
         def indexes = statementMap.get(MessageProcessor.StatementType.INDEXES)
 
-        //RETURN apoc.schema.node.indexExists("Card", ["Email","EmployeeId"])
-        if (createIndexes) {
-            Neo4J.run(driver, indexes, [:])
+        //todo: This seems very smelly, but is the easiest way to attempt to create the indexes. There is an apoc method
+        // to test if an index exists //RETURN apoc.schema.node.indexExists("Card", ["Email","EmployeeId"]), but the logic to deconstruct the
+        // index to create this statement is more trouble than it's worth. We'll try to create them and let it fail
+        indexes.each() { index ->
+            try {
+                Neo4J.run(driver,index)
+            } catch (Exception e) {
+                //nothing to do here as index already exists.
+            }
+
         }
+
     }
 
 }

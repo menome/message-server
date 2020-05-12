@@ -72,6 +72,16 @@ class MessagingSpecification extends Specification {
             .build()
             .toJSON()
 
+    protected static String invalidMessage = MessageBuilder.builder()
+            .Name("Bad Message")
+            .NodeType("Invalid")
+            .Priority(1)
+            .SourceSystem("Bad Actor")
+            .ConformedDimensions("Id": "-")
+            .Properties(["Status": "active"])
+            .build()
+            .toJSON()
+
 
     protected static List<String> threeMessageBatch = (1..3).collect() {
         buildEmployeeMessageWithConnections(true)
