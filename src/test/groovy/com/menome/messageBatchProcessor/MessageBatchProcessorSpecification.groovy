@@ -82,8 +82,23 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         results.second
         invalidMessage == results.second[0].second
         0 == Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt()
-
     }
+
+
+    def "batch of three with status"() {
+        given:
+        Driver driver = Neo4J.openDriver()
+        when:
+        def results = MessageBatchProcessor.process(threeMessageBatch, driver)
+
+        then:
+        results.first
+        def status = results.first
+        status.each(){key,value->
+            log.info("$key $value")
+        }
+    }
+
 
     def "message with missing node type expect error tuple"() {
 

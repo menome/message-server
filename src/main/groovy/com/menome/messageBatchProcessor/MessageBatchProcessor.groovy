@@ -9,6 +9,8 @@ import org.neo4j.driver.Driver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+import java.util.concurrent.TimeUnit
+
 class MessageBatchProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
@@ -46,8 +48,12 @@ class MessageBatchProcessor {
         }
         timer.stop()
 
-        log.info("elapsed = " + timer.formatTime())
-
+        def messagesPerSecond = messages.size() / timer.getTime(TimeUnit.MILLISECONDS)
+        batchStatus.put("Messages Processed",messages.size().toString())
+        batchStatus.put("Messages Per Second",messagesPerSecond.toString())
+        batchStatus.put("Elapsed Time (ms)",timer.getTime(TimeUnit.MILLISECONDS).toString())
+        batchStatus.put("Elapsed Time (s)",timer.getTime(TimeUnit.SECONDS).toString())
+        batchStatus.put("Errors:",errors.size().toString())
         return new Tuple2<Map, List<Tuple2>>(batchStatus,errors)
     }
 
@@ -72,7 +78,7 @@ class MessageBatchProcessor {
         String unwind = "UNWIND \$parms AS param " + statement
         Map parameters = ["parms": nodeParameters]
 
-        log.info(unwind)
+        log.debug(unwind)
         try {
             Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
         } catch (Exception e){
