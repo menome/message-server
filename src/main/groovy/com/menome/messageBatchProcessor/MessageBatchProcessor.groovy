@@ -22,9 +22,26 @@ class MessageBatchProcessor {
         timer.start();
 
         List<Tuple2<String, String>> errors = []
-        Map<String,String> batchStatus = [:]
 
+        def t = groupMessagesByNodeType(messages)
+        Map<String, List<String>> messagesByNodeType = t.first
+        errors.addAll(t.second)
+
+        messagesByNodeType.each { nodeType, msgs ->
+            Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(msgs.get(0))
+            processIndexes(msgs, driver)
+            processConnectionMerges(msgs, statementMap, driver)
+            errors.addAll(processPrimaryNodeMerges(msgs, statementMap, driver))
+        }
+        timer.stop()
+
+        def batchStatus = generateStatusResults(messages, timer)
+        return new Tuple2<Map, List<Tuple2>>(batchStatus,errors)
+    }
+
+    private static Tuple2<Map<String, List<String>>,List<Tuple2>> groupMessagesByNodeType(List<String> messages){
         Map<String, List<String>> messagesByNodeType = [:]
+        List errors = []
         messages.each() { String jsonMessage ->
             def msg = MessageProcessor.buildMapFromJSONString(jsonMessage)
             String nodeType = msg.NodeType
@@ -39,23 +56,19 @@ class MessageBatchProcessor {
                 errors.add(ErrorHandlerHelper.toTupple(new InvalidMessageException("Missing NodeType"), jsonMessage))
             }
         }
-
-        messagesByNodeType.each { nodeType, msgs ->
-            Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(msgs.get(0))
-            processIndexes(msgs, driver)
-            processConnectionMerges(msgs, statementMap, driver)
-            errors.addAll(processPrimaryNodeMerges(msgs, statementMap, driver))
-        }
-        timer.stop()
-
-        def messagesPerSecond = messages.size() / timer.getTime(TimeUnit.MILLISECONDS)
-        batchStatus.put("Messages Processed",messages.size().toString())
-        batchStatus.put("Messages Per Second",messagesPerSecond.toString())
-        batchStatus.put("Elapsed Time (ms)",timer.getTime(TimeUnit.MILLISECONDS).toString())
-        batchStatus.put("Elapsed Time (s)",timer.getTime(TimeUnit.SECONDS).toString())
-        batchStatus.put("Errors:",errors.size().toString())
-        return new Tuple2<Map, List<Tuple2>>(batchStatus,errors)
+        return new Tuple2(messagesByNodeType,errors)
     }
+
+    private static LinkedHashMap<String, String> generateStatusResults(List<String> messages, StopWatch timer) {
+        Map<String, String> batchStatus = [:]
+        def messagesPerSecond = messages.size() / timer.getTime(TimeUnit.MILLISECONDS)
+        batchStatus.put("Messages Processed", messages.size().toString())
+        batchStatus.put("Messages Per Second", messagesPerSecond.toString())
+        batchStatus.put("Elapsed Time (ms)", timer.getTime(TimeUnit.MILLISECONDS).toString())
+        batchStatus.put("Elapsed Time (s)", timer.getTime(TimeUnit.SECONDS).toString())
+        batchStatus
+    }
+
 
     private static  List<Tuple2<String,String>> processPrimaryNodeMerges(List<String> messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
         List<Map<String, String>> nodeParameters = []
@@ -98,6 +111,7 @@ class MessageBatchProcessor {
 
     private static List<Object> processConnectionMerges(List messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
 
+        // Need to group all merges and keep unique set of parameters for each merge in some sort of structure.
         Map params = MessageProcessor.processParameterForConnections(messages.get(0))
         def connectionMerges = new HashSet()
         connectionMerges.addAll(statementMap.get(MessageProcessor.StatementType.CONNECTION_MERGE))

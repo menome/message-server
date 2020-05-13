@@ -99,17 +99,6 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         checkIfIndexExistsInRecordSet(records, ["Card"], ["Email", "EmployeeId"])
     }
 
-    boolean checkIfIndexExistsInRecordSet(List<Record> records, List<String> label, List<String> properties) {
-        boolean rc = false;
-        records.each() { record ->
-            def map = record.asMap()
-            if (map.get("labelsOrTypes") == label && map.get("properties") == properties){
-                rc = true
-            }
-        }
-        return rc
-    }
-
 
     def "batch of three with status"() {
         given:
@@ -138,9 +127,12 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         then:
         results.second.size() == 2
         5 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
-
     }
 
+    def "batch with multiple connections of same type different values"(){
+        //city Victoria
+        //city Calgary etc.
+    }
 
     def "message with missing node type expect error tuple"() {
     }
@@ -151,6 +143,19 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
 
     def "properties can't have spaces"() {
 
+    }
+
+
+
+    boolean checkIfIndexExistsInRecordSet(List<Record> records, List<String> label, List<String> properties) {
+        boolean rc = false;
+        records.each() { record ->
+            def map = record.asMap()
+            if (map.get("labelsOrTypes") == label && map.get("properties") == properties){
+                rc = true
+            }
+        }
+        return rc
     }
 
 
