@@ -79,11 +79,12 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         given:
         Driver driver = Neo4J.openDriver()
         when:
-        def results = MessageBatchProcessor.process(List.of(invalidMessage), driver)
+        MessageBatchResult result = MessageBatchProcessor.process(List.of(invalidMessage), driver)
 
         then:
-        results.second
-        invalidMessage == results.second[0].second
+        result.errors
+        result.batchSummary.errorCount == 1
+        invalidMessage == result.errors[0].message
         0 == Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt()
     }
 
@@ -104,14 +105,12 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         given:
         Driver driver = Neo4J.openDriver()
         when:
-        def results = MessageBatchProcessor.process(threeMessageBatch, driver)
+        MessageBatchResult result = MessageBatchProcessor.process(threeMessageBatch, driver)
 
         then:
-        results.first
-        def status = results.first
-        status.each() { key, value ->
-            log.info("$key $value")
-        }
+        result.batchSummary
+        !result.errors
+        log.info(result.toString())
     }
 
     def "seven messages with two errors"() {
@@ -123,9 +122,10 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         }
         messages.add(invalidMessage)
         messages.add(invalidMessage)
-        def results = MessageBatchProcessor.process(messages, driver)
+        MessageBatchResult result = MessageBatchProcessor.process(messages, driver)
         then:
-        results.second.size() == 2
+        result.batchSummary.errorCount == 2
+        result.errors.size() == 2
         5 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
     }
 

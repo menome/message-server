@@ -1,6 +1,6 @@
 package com.menome.messageBatchProcessor
 
-import com.menome.errorHandler.ErrorHandlerHelper
+
 import com.menome.messageProcessor.InvalidMessageException
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.util.Neo4J
@@ -9,19 +9,20 @@ import org.neo4j.driver.Driver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 class MessageBatchProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
 
-    static Tuple2<Map,List<Tuple2>> process(List<String> messages, Driver driver) {
+    static MessageBatchResult process(List<String> messages, Driver driver) {
 
         log.info(Thread.currentThread().getName() + " " + messages.size());
         StopWatch timer = new StopWatch();
         timer.start();
 
-        List<Tuple2<String, String>> errors = []
+        List<MessageError> errors = []
 
         def t = groupMessagesByNodeType(messages)
         Map<String, List<String>> messagesByNodeType = t.first
@@ -35,13 +36,13 @@ class MessageBatchProcessor {
         }
         timer.stop()
 
-        def batchStatus = generateStatusResults(messages, timer)
-        return new Tuple2<Map, List<Tuple2>>(batchStatus,errors)
+        def batchSummary = new MessageBatchSummary(messages.size(), errors.size(),Duration.ofMillis(timer.getTime(TimeUnit.MILLISECONDS)))
+        new MessageBatchResult(batchSummary,errors)
     }
 
-    private static Tuple2<Map<String, List<String>>,List<Tuple2>> groupMessagesByNodeType(List<String> messages){
+    private static Tuple2<Map<String, List<String>>,List<MessageError>> groupMessagesByNodeType(List<String> messages){
         Map<String, List<String>> messagesByNodeType = [:]
-        List errors = []
+        List<MessageError> errors = []
         messages.each() { String jsonMessage ->
             def msg = MessageProcessor.buildMapFromJSONString(jsonMessage)
             String nodeType = msg.NodeType
@@ -53,26 +54,18 @@ class MessageBatchProcessor {
                 messageList.add(jsonMessage)
                 messagesByNodeType.put(nodeType, messageList)
             } else {
-                errors.add(ErrorHandlerHelper.toTupple(new InvalidMessageException("Missing NodeType"), jsonMessage))
+                errors.add(new MessageError(new InvalidMessageException("Missing NodeType").toString(), jsonMessage))
             }
         }
         return new Tuple2(messagesByNodeType,errors)
     }
 
-    private static LinkedHashMap<String, String> generateStatusResults(List<String> messages, StopWatch timer) {
-        Map<String, String> batchStatus = [:]
-        def messagesPerSecond = messages.size() / timer.getTime(TimeUnit.MILLISECONDS)
-        batchStatus.put("Messages Processed", messages.size().toString())
-        batchStatus.put("Messages Per Second", messagesPerSecond.toString())
-        batchStatus.put("Elapsed Time (ms)", timer.getTime(TimeUnit.MILLISECONDS).toString())
-        batchStatus.put("Elapsed Time (s)", timer.getTime(TimeUnit.SECONDS).toString())
-        batchStatus
-    }
 
 
-    private static  List<Tuple2<String,String>> processPrimaryNodeMerges(List<String> messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
+    //todo: I'm, throwing away the Neo4J result. Might be some useful information in there for the summary.
+    private static  List<MessageError> processPrimaryNodeMerges(List<String> messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
         List<Map<String, String>> nodeParameters = []
-        List<Tuple2<String,String>> errors = []
+        List<MessageError> errors = []
         messages.each() { String message ->
             def map = MessageProcessor.processPrimaryNodeParametersAsMap(message)
             Map<String, Map<String, String>> conformedDimensionsMap = MessageProcessor.processParameterForConnections(message)
@@ -103,7 +96,7 @@ class MessageBatchProcessor {
                     return errors
                 }
             } else {
-                errors.add(ErrorHandlerHelper.toTupple(e,messages[0]))
+                errors.add(new MessageError(e.toString(),messages[0]))
             }
         }
         return errors;
