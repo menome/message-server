@@ -3,6 +3,7 @@ package com.menome.messageBatchProcessor
 
 import com.menome.messageProcessor.InvalidMessageException
 import com.menome.messageProcessor.MessageProcessor
+import com.menome.messageProcessor.Neo4JStatements
 import com.menome.util.Neo4J
 import org.apache.commons.lang3.time.StopWatch
 import org.neo4j.driver.Driver
@@ -29,10 +30,10 @@ class MessageBatchProcessor {
         errors.addAll(t.second)
 
         messagesByNodeType.each { nodeType, msgs ->
-            Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(msgs.get(0))
+            Neo4JStatements statements = MessageProcessor.process(msgs.get(0))
             processIndexes(msgs, driver)
-            processConnectionMerges(msgs, statementMap, driver)
-            errors.addAll(processPrimaryNodeMerges(msgs, statementMap, driver))
+            processConnectionMerges(msgs, statements, driver)
+            errors.addAll(processPrimaryNodeMerges(msgs, statements, driver))
         }
         timer.stop()
 
@@ -60,10 +61,8 @@ class MessageBatchProcessor {
         return new Tuple2(messagesByNodeType,errors)
     }
 
-
-
     //todo: I'm, throwing away the Neo4J result. Might be some useful information in there for the summary.
-    private static  List<MessageError> processPrimaryNodeMerges(List<String> messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
+    private static  List<MessageError> processPrimaryNodeMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
         List<Map<String, String>> nodeParameters = []
         List<MessageError> errors = []
         messages.each() { String message ->
@@ -78,7 +77,7 @@ class MessageBatchProcessor {
         }
 
         String statement = ""
-        statementMap.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE).each() { String statementFragment ->
+        statements.primaryNodeMerge.each() { String statementFragment ->
             statement += statementFragment + "\n"
         }
         String unwind = "UNWIND \$parms AS param " + statement
@@ -91,8 +90,8 @@ class MessageBatchProcessor {
             if (messages.size() > 1){
                 List<String> segments = messages.collate(messages.size().intdiv(2),true)
                 segments.each(){segmentMessages->
-                    Map<MessageProcessor.StatementType, List<String>> typeListMap = MessageProcessor.process(segmentMessages[0])
-                    errors.addAll(processPrimaryNodeMerges(segmentMessages,typeListMap,driver))
+                    Neo4JStatements segmentStatements = MessageProcessor.process(segmentMessages[0])
+                    errors.addAll(processPrimaryNodeMerges(segmentMessages,segmentStatements,driver))
                     return errors
                 }
             } else {
@@ -102,12 +101,12 @@ class MessageBatchProcessor {
         return errors;
     }
 
-    private static List<Object> processConnectionMerges(List messages, Map<MessageProcessor.StatementType, List<String>> statementMap, Driver driver) {
+    private static List<Object> processConnectionMerges(List messages, Neo4JStatements statements, Driver driver) {
 
-        // Need to group all merges and keep unique set of parameters for each merge in some sort of structure.
+        // todo: Need to group all merges and keep unique set of parameters for each merge in some sort of structure.
         Map params = MessageProcessor.processParameterForConnections(messages.get(0))
         def connectionMerges = new HashSet()
-        connectionMerges.addAll(statementMap.get(MessageProcessor.StatementType.CONNECTION_MERGE))
+        connectionMerges.addAll(statements.connectionMerge)
 
         def list = new ArrayList(connectionMerges)
 
@@ -122,11 +121,11 @@ class MessageBatchProcessor {
 
     private static void processIndexes(List<String> messages, Driver driver) {
 
-        Map<MessageProcessor.StatementType, List<String>> statementMap = MessageProcessor.process(messages.get(0))
-        def indexes = statementMap.get(MessageProcessor.StatementType.INDEXES)
+        Neo4JStatements statements = MessageProcessor.process(messages.get(0))
+        def indexes = statements.indexes
 
         //todo: This seems very smelly, but is the easiest way to attempt to create the indexes. There is an apoc method
-        // to test if an index exists //RETURN apoc.schema.node.indexExists("Card", ["Email","EmployeeId"]), but the logic to deconstruct the
+        // to test if an index exists apoc.schema.node.indexExists("Card", ["Email","EmployeeId"]), but the logic to deconstruct the
         // index to create this statement is more trouble than it's worth. We'll try to create them and let it fail
         indexes.each() { index ->
             try {
@@ -134,9 +133,6 @@ class MessageBatchProcessor {
             } catch (Exception e) {
                 //nothing to do here as index already exists.
             }
-
         }
-
     }
-
 }

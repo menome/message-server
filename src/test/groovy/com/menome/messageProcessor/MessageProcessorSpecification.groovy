@@ -4,30 +4,29 @@ import com.menome.MessagingSpecification
 
 class MessageProcessorSpecification extends MessagingSpecification {
 
-    List<String> processMessage(String message, MessageProcessor.StatementType statementType) {
+    Neo4JStatements processMessage(String message) {
         MessageProcessor processor = new MessageProcessor()
-        Map<MessageProcessor.StatementType, List<String>> process = processor.process(message)
-        return process.get(statementType)
+        processor.process(message)
     }
 
     List<String> processPrimaryNodeMergeForMessageWithoutConnections() {
-        return processMessage(simpleMessage, MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
+        return processMessage(simpleMessage).primaryNodeMerge
     }
 
     List<String> processPrimaryNodeMergeForMessageWithConnections() {
-        return processMessage(employeeMessageWithConnections, MessageProcessor.StatementType.PRIMARY_NODE_MERGE)
+        return processMessage(employeeMessageWithConnections).primaryNodeMerge
     }
 
     List<String> processIndexesForMessageWithConnections() {
-        return processMessage(employeeMessageWithConnections, MessageProcessor.StatementType.INDEXES)
+        return processMessage(employeeMessageWithConnections).indexes
     }
 
     List<String> processConnectionMergesMessageWithConnections() {
-        return processMessage(employeeMessageWithConnections, MessageProcessor.StatementType.CONNECTION_MERGE)
+        return processMessage(employeeMessageWithConnections).connectionMerge
     }
 
     List<String> processConnectionMatchesMessageWithConnections() {
-        return processMessage(employeeMessageWithConnections, MessageProcessor.StatementType.CONNECTION_MATCH)
+        return processMessage(employeeMessageWithConnections).connectionMatch
     }
 
 
@@ -46,9 +45,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         def msg = ""
         MessageProcessor processor = new MessageProcessor()
-        Map<MessageProcessor.StatementType, List<String>> statements = processor.process(msg)
+        Neo4JStatements statements = processor.process(msg)
         expect:
-        statements.isEmpty()
+        !statements
     }
 
 
@@ -136,11 +135,11 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         MessageProcessor processor = new MessageProcessor()
         when:
-        Map<MessageProcessor.StatementType, List<String>> process = processor.process(employeeMessageWithConnections)
+        Neo4JStatements statements = processor.process(employeeMessageWithConnections)
         then:
-        process.get(MessageProcessor.StatementType.PRIMARY_NODE_MERGE).size() == 7
-        process.get(MessageProcessor.StatementType.INDEXES).size() == 2
-        process.get(MessageProcessor.StatementType.CONNECTION_MERGE).size() == 3
+        statements.primaryNodeMerge.size() ==  7
+        statements.indexes.size() == 2
+        statements.connectionMerge.size() == 3
     }
 
     def "process parameter"() {
@@ -221,7 +220,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
     def "allow relationships with the same type within the message"(){
         given:
         def results = MessageProcessor.process(meetingMessageWithConnections)
-        def primaryNodeMerge = results[MessageProcessor.StatementType.PRIMARY_NODE_MERGE]
+        def primaryNodeMerge = results.primaryNodeMerge
         expect:
         1==1
     }

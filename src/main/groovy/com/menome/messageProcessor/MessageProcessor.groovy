@@ -6,25 +6,20 @@ import org.slf4j.LoggerFactory
 
 class MessageProcessor {
 
-    enum StatementType {
-        PRIMARY_NODE_MERGE,
-        INDEXES,
-        CONNECTION_MERGE,
-        CONNECTION_MATCH
-    }
 
     static Logger log = LoggerFactory.getLogger(MessageProcessor.class)
 
-    static Map<StatementType, List<String>> process(String msg) {
-        Map<StatementType, List<String>> typesOfStatements = [:]
+    static Neo4JStatements process(String msg) {
+        Neo4JStatements statements = null;
         if (msg) {
             def msgMap = buildMapFromJSONString(msg)
-            typesOfStatements.put(StatementType.PRIMARY_NODE_MERGE, processPrimaryNodeMerge(msgMap))
-            typesOfStatements.put(StatementType.INDEXES, processIndexes(msgMap))
-            typesOfStatements.put(StatementType.CONNECTION_MERGE, processConnectionMerges(msgMap))
-            typesOfStatements.put(StatementType.CONNECTION_MATCH, processConnectionMatches(msgMap))
+            List<String> primaryNodeMerge = processPrimaryNodeMerge(msgMap)
+            List<String> indexes = processIndexes(msgMap)
+            List<String> connectionMerges = processConnectionMerges(msgMap)
+            List<String> connectionMatches = processConnectionMatches(msgMap)
+            statements = new Neo4JStatements(primaryNodeMerge,indexes,connectionMerges,connectionMatches)
         }
-        typesOfStatements
+        statements
     }
 
     static List<String> processPrimaryNodeMerge(Map msgMap) {
