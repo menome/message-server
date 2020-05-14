@@ -32,7 +32,7 @@ class DataRefineryServerSpecification extends MessagingSpecification {
 
         def rabbitChannel = openRabbitMQChanel(RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY,rabbitConnectionFactory)
         (1..messageCount).each { it ->
-            String message = employeeMessageWithConnections.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
+            String message = victoriaEmployee.replaceAll("konrad.aust@menome.com", "konrad.aust$it@menome.com")
             //println "Publishing:$message"
             rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
         }

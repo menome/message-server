@@ -41,7 +41,7 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
     def "batch of one valid message"() {
         given:
         Driver driver = Neo4J.openDriver()
-        MessageBatchProcessor.process(List.of(employeeMessageWithConnections), driver)
+        MessageBatchProcessor.process(List.of(victoriaEmployee), driver)
         expect:
         1 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
     }
@@ -92,7 +92,7 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         given()
         Driver driver = Neo4J.openDriver()
         when:
-        MessageBatchProcessor.process(List.of(employeeMessageWithConnections), driver)
+        MessageBatchProcessor.process(List.of(victoriaEmployee), driver)
         Result result = Neo4J.run(driver, "CALL db.indexes()")
         List <Record> records = result.collect()
         then:
@@ -118,7 +118,7 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         Driver driver = Neo4J.openDriver()
         when:
         def messages = (1..5).collect() {
-            buildEmployeeMessageWithConnections(true)
+            buildVictoriaEmployeeMessage(true)
         }
         messages.add(invalidMessage)
         messages.add(invalidMessage)
@@ -130,6 +130,14 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
     }
 
     def "batch with multiple connections of same type different values"(){
+        given:
+        Driver driver = Neo4J.openDriver()
+        when:
+        MessageBatchProcessor.process(List.of(calgaryEmployee,victoriaEmployee,calgaryEmployee),driver)
+        then:
+        2 == Neo4J.run(driver, "match(o:Office) return count(o) as count").single().get("count").asInt()
+        1 == Neo4J.run(driver, "match(o:Office) where o.City=\"Victoria\" return count(o) as count").single().get("count").asInt()
+        1 == Neo4J.run(driver, "match(o:Office) where o.City=\"Calgary\" return count(o) as count").single().get("count").asInt()
         //city Victoria
         //city Calgary etc.
     }

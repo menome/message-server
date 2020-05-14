@@ -101,21 +101,21 @@ class MessageBatchProcessor {
         return errors;
     }
 
-    private static List<Object> processConnectionMerges(List messages, Neo4JStatements statements, Driver driver) {
+    private static List<Object> processConnectionMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
 
-        // todo: Need to group all merges and keep unique set of parameters for each merge in some sort of structure.
-        Map params = MessageProcessor.processParameterForConnections(messages.get(0))
-        def connectionMerges = new HashSet()
-        connectionMerges.addAll(statements.connectionMerge)
+        HashSet <Map> uniqueParms = new HashSet<>()
+        messages.each(){String message->
+            uniqueParms.add(MessageProcessor.processParameterForConnections(message))
+        }
 
-        def list = new ArrayList(connectionMerges)
-
-        list.each() {
-            String key = MessageProcessor.deriveMessageTypeFromStatement(it)
-            Map confirmedDimensionParms = params.get(key)
-            String unwind = "UNWIND \$parms AS param " + it
-            Map parameters = ["parms": List.of(confirmedDimensionParms)]
-            Neo4J.run(driver, unwind, parameters)
+        new ArrayList(uniqueParms).each() { parmsMap ->
+            statements.connectionMerge.each() {
+                String key = MessageProcessor.deriveMessageTypeFromStatement(it)
+                Map confirmedDimensionParms = parmsMap.get(key)
+                String unwind = "UNWIND \$parms AS param " + it
+                Map parameters = ["parms": List.of(confirmedDimensionParms)]
+                Neo4J.run(driver, unwind, parameters)
+            }
         }
     }
 

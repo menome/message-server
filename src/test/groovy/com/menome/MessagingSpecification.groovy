@@ -39,13 +39,22 @@ class MessagingSpecification extends Specification {
             .toJSON()
 
 
-    protected static office = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
+    protected static victoriaOffice = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
+    protected static calgaryOffice = Connection.builder().Name("Menome Calgary").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Calgary"]).build()
     protected static project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
     protected static team = Connection.builder().Name("theLink Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
 
-    protected static String employeeMessageWithConnections = buildEmployeeMessageWithConnections(false)
+    protected static String victoriaEmployee = buildVictoriaEmployeeMessage(false)
+    protected static String calgaryEmployee = buildCalgaryEmployeeMessage(false)
 
-    protected static String buildEmployeeMessageWithConnections(boolean generateUniqeId) {
+    protected static String buildVictoriaEmployeeMessage(boolean generateUniqeId){
+        buildEmployeeMessage(generateUniqeId,victoriaOffice)
+    }
+
+    protected static buildCalgaryEmployeeMessage(boolean generateUniqueId){
+        buildEmployeeMessage(generateUniqueId,calgaryOffice)
+    }
+    protected static String buildEmployeeMessage(boolean generateUniqeId, Connection officeConnection) {
         MessageBuilder.builder()
                 .Name("Konrad Aust")
                 .NodeType("Employee")
@@ -53,7 +62,7 @@ class MessagingSpecification extends Specification {
                 .SourceSystem("HRSystem")
                 .ConformedDimensions("Email": "konrad.aust" + (generateUniqeId ? UUID.randomUUID() : "") + "@menome.com", "EmployeeId": 12345)
                 .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
-                .Connections([office, project, team])
+                .Connections([officeConnection, project, team])
                 .build()
                 .toJSON()
     }
@@ -84,11 +93,11 @@ class MessagingSpecification extends Specification {
 
 
     protected static List<String> threeMessageBatch = (1..3).collect() {
-        buildEmployeeMessageWithConnections(true)
+        buildVictoriaEmployeeMessage(true)
     }
 
     protected static List<String> twoMessagesDifferentTypeBatch = [
-            employeeMessageWithConnections,
+            victoriaEmployee,
             meetingMessageWithConnections]
 
 
@@ -100,7 +109,7 @@ class MessagingSpecification extends Specification {
                 .SourceSystem("HRSystem")
                 .ConformedDimensions("Email": "konrad.aust" + UUID.randomUUID() + "@menome.com", "EmployeeId": UUID.randomUUID())
                 .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
-                .Connections([office, project, team])
+                .Connections([victoriaOffice, project, team])
                 .build()
                 .toJSON()
     }

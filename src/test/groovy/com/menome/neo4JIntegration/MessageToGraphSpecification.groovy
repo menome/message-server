@@ -53,7 +53,7 @@ class MessageToGraphSpecification extends MessagingSpecification {
         Session session = neo4JDriver.session()
         when:
 
-        processor.process(employeeMessageWithConnections)
+        processor.process(victoriaEmployee)
         List<String> statements = processor.getNeo4JStatements()
         Neo4J.executeStatementListInSession(statements, session)
         session.close()
