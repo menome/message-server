@@ -19,9 +19,9 @@ class MessageBatchProcessor {
 
     static MessageBatchResult process(List<String> messages, Driver driver) {
 
-        log.info(Thread.currentThread().getName() + " " + messages.size());
-        StopWatch timer = new StopWatch();
-        timer.start();
+        log.info(Thread.currentThread().getName() + " " + messages.size())
+        StopWatch timer = new StopWatch()
+        timer.start()
 
         List<MessageError> errors = []
 
@@ -32,7 +32,7 @@ class MessageBatchProcessor {
         messagesByNodeType.each { nodeType, msgs ->
             Neo4JStatements statements = MessageProcessor.process(msgs.get(0))
             processIndexes(msgs, driver)
-            processConnectionMerges(msgs, statements, driver)
+            errors.addAll(processConnectionMerges(msgs, statements, driver))
             errors.addAll(processPrimaryNodeMerges(msgs, statements, driver))
         }
         timer.stop()
@@ -98,11 +98,12 @@ class MessageBatchProcessor {
                 errors.add(new MessageError(e.toString(),messages[0]))
             }
         }
-        return errors;
+        errors
     }
 
-    private static List<Object> processConnectionMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
+    private static List<MessageError> processConnectionMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
 
+        List<MessageError> errors = []
         HashSet <Map> uniqueParms = new HashSet<>()
         messages.each(){String message->
             uniqueParms.add(MessageProcessor.processParameterForConnections(message))
@@ -114,9 +115,14 @@ class MessageBatchProcessor {
                 Map confirmedDimensionParms = parmsMap.get(key)
                 String unwind = "UNWIND \$parms AS param " + it
                 Map parameters = ["parms": List.of(confirmedDimensionParms)]
-                Neo4J.run(driver, unwind, parameters)
+                try {
+                    Neo4J.run(driver, unwind, parameters)
+                } catch(Exception e){
+                    errors.add(new MessageError(e.toString(),unwind))
+                }
             }
         }
+        errors
     }
 
     private static void processIndexes(List<String> messages, Driver driver) {

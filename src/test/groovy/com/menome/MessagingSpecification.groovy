@@ -91,6 +91,18 @@ class MessagingSpecification extends Specification {
             .build()
             .toJSON()
 
+    protected static badConnection = Connection.builder().Name("Bad Connection").NodeType("Bad Connection").RelType("Bad").ForewardRel(true).ConformedDimensions(["id": UUID.randomUUID()]).build()
+    protected static String validMessageWithInvalidConnection = MessageBuilder.builder()
+            .Name("Good Message")
+            .NodeType("GoodNode")
+            .Priority(1)
+            .SourceSystem("Bad Actor")
+            .ConformedDimensions("Id": 1)
+            .Properties(["Status": "active"])
+            .Connections([badConnection])
+            .build()
+            .toJSON()
+
 
     protected static List<String> threeMessageBatch = (1..3).collect() {
         buildVictoriaEmployeeMessage(true)

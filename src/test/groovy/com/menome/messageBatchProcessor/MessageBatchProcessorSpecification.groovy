@@ -138,8 +138,19 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         2 == Neo4J.run(driver, "match(o:Office) return count(o) as count").single().get("count").asInt()
         1 == Neo4J.run(driver, "match(o:Office) where o.City=\"Victoria\" return count(o) as count").single().get("count").asInt()
         1 == Neo4J.run(driver, "match(o:Office) where o.City=\"Calgary\" return count(o) as count").single().get("count").asInt()
-        //city Victoria
-        //city Calgary etc.
+    }
+
+    def "error expected from bad connection node"(){
+        given:
+        Driver driver = Neo4J.openDriver()
+        when:
+        MessageBatchResult result = MessageBatchProcessor.process(List.of(validMessageWithInvalidConnection), driver)
+
+        then:
+        result.errors
+        result.batchSummary.errorCount == 1
+        validMessageWithInvalidConnection == result.errors[0].message
+        0 == Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt()
     }
 
     def "message with missing node type expect error tuple"() {
@@ -150,7 +161,6 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
     }
 
     def "properties can't have spaces"() {
-
     }
 
 
