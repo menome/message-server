@@ -19,7 +19,7 @@ class MessageBatchProcessor {
 
     static MessageBatchResult process(List<String> messages, Driver driver) {
 
-        log.info(Thread.currentThread().getName() + " " + messages.size())
+        log.debug(Thread.currentThread().getName() + " " + messages.size())
         StopWatch timer = new StopWatch()
         timer.start()
 

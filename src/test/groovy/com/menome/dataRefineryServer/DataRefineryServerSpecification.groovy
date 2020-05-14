@@ -15,7 +15,7 @@ class DataRefineryServerSpecification extends MessagingSpecification {
     def "test 50 messages delivered over rabbit to server"() {
         given:
         DataRefineryServer.startServer()
-        publishMessagesToRabbit(503)
+        publishMessagesToRabbit(25000)
         expect:
         sleep(10000)
         //todo:Write some neo4j queries here
