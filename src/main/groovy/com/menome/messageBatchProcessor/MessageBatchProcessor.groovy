@@ -37,11 +37,11 @@ class MessageBatchProcessor {
         }
         timer.stop()
 
-        def batchSummary = new MessageBatchSummary(messages.size(), errors.size(),Duration.ofMillis(timer.getTime(TimeUnit.MILLISECONDS)))
-        new MessageBatchResult(batchSummary,errors)
+        def batchSummary = new MessageBatchSummary(messages.size(), errors.size(), Duration.ofMillis(timer.getTime(TimeUnit.MILLISECONDS)))
+        new MessageBatchResult(batchSummary, errors)
     }
 
-    private static Tuple2<Map<String, List<String>>,List<MessageError>> groupMessagesByNodeType(List<String> messages){
+    private static Tuple2<Map<String, List<String>>, List<MessageError>> groupMessagesByNodeType(List<String> messages) {
         Map<String, List<String>> messagesByNodeType = [:]
         List<MessageError> errors = []
         messages.each() { String jsonMessage ->
@@ -58,11 +58,11 @@ class MessageBatchProcessor {
                 errors.add(new MessageError(new InvalidMessageException("Missing NodeType").toString(), jsonMessage))
             }
         }
-        return new Tuple2(messagesByNodeType,errors)
+        return new Tuple2(messagesByNodeType, errors)
     }
 
     //todo: I'm, throwing away the Neo4J result. Might be some useful information in there for the summary.
-    private static  List<MessageError> processPrimaryNodeMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
+    private static List<MessageError> processPrimaryNodeMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
         List<Map<String, String>> nodeParameters = []
         List<MessageError> errors = []
         messages.each() { String message ->
@@ -86,16 +86,16 @@ class MessageBatchProcessor {
         log.debug(unwind)
         try {
             Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
-        } catch (Exception e){
-            if (messages.size() > 1){
-                List<String> segments = messages.collate(messages.size().intdiv(2),true)
-                segments.each(){segmentMessages->
+        } catch (Exception e) {
+            if (messages.size() > 1) {
+                List<String> segments = messages.collate(messages.size().intdiv(2), true)
+                segments.each() { segmentMessages ->
                     Neo4JStatements segmentStatements = MessageProcessor.process(segmentMessages[0])
-                    errors.addAll(processPrimaryNodeMerges(segmentMessages,segmentStatements,driver))
+                    errors.addAll(processPrimaryNodeMerges(segmentMessages, segmentStatements, driver))
                     return errors
                 }
             } else {
-                errors.add(new MessageError(e.toString(),messages[0]))
+                errors.add(new MessageError(e.toString(), messages[0]))
             }
         }
         errors
@@ -104,22 +104,39 @@ class MessageBatchProcessor {
     private static List<MessageError> processConnectionMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
 
         List<MessageError> errors = []
-        HashSet <Map> uniqueParms = new HashSet<>()
-        messages.each(){String message->
-            uniqueParms.add(MessageProcessor.processParameterForConnections(message))
-        }
+        Map<String, HashSet> uniqueParameters = [:]
 
-        new ArrayList(uniqueParms).each() { parmsMap ->
+        // Initialize unique map with the set of parameters names from the first message. All messages in the messages parameter are of the same
+        // type so we can assume they will all have the same set of parameters
+        if (messages) {
             statements.connectionMerge.each() {
                 String key = MessageProcessor.deriveMessageTypeFromStatement(it)
-                Map confirmedDimensionParms = parmsMap.get(key)
-                String unwind = "UNWIND \$parms AS param " + it
-                Map parameters = ["parms": List.of(confirmedDimensionParms)]
-                try {
-                    Neo4J.run(driver, unwind, parameters)
-                } catch(Exception e){
-                    errors.add(new MessageError(e.toString(),unwind))
-                }
+                uniqueParameters.put(key, new HashSet())
+            }
+        }
+
+        //Iterate over all of the messages getting the parameters for each of the connections. We build up a unique parameters by adding the
+        // parameters to the hashset associated with the parameter type. There is no need to merge the exact same parameters over and over again
+        messages.each() { String message ->
+            Map<String, Map<String, String>> parmsFromMessage = MessageProcessor.processParameterForConnections(message)
+            statements.connectionMerge.each() {
+                String key = MessageProcessor.deriveMessageTypeFromStatement(it)
+                Map<String, String> parmsForStatement = parmsFromMessage.get(key)
+                HashSet parmset = uniqueParameters.get(key)
+                parmset.add(parmsForStatement)
+                uniqueParameters.put(key, parmset)
+            }
+        }
+
+        statements.connectionMerge.each() {
+            String key = MessageProcessor.deriveMessageTypeFromStatement(it)
+            List<String> parameters = new ArrayList(uniqueParameters.get(key))
+            String unwind = "UNWIND \$parms AS param " + it
+            Map neo4JParameters = ["parms": parameters]
+            try {
+                Neo4J.run(driver, unwind, neo4JParameters)
+            } catch (Exception e) {
+                errors.add(new MessageError(e.toString(), unwind))
             }
         }
         errors

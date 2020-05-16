@@ -4,6 +4,7 @@ import com.menome.messageBatchProcessor.MessageBatchProcessor;
 import com.menome.messageBatchProcessor.MessageBatchResult;
 import com.menome.messageBatchProcessor.MessageBatchSummary;
 import com.menome.util.Neo4J;
+import com.menome.util.RabbitMQ;
 import com.rabbitmq.client.Address;
 import com.rabbitmq.client.ConnectionFactory;
 import org.neo4j.driver.Driver;
@@ -20,7 +21,7 @@ import java.time.Duration;
 public class DataRefineryServer {
 
     private static final String RABBITMQ_QUEUE_NAME = "test_queue";
-    private static final int RABBITMQ_PORT = 5672;
+
 
     static Logger log = LoggerFactory.getLogger(DataRefineryServer.class);
 
@@ -31,7 +32,7 @@ public class DataRefineryServer {
     public static void startServer() {
         log.info("Starting Server...");
 
-        ConnectionFactory rabbitConnectionFactory = createRabbitConnectionFactory();
+        ConnectionFactory rabbitConnectionFactory = RabbitMQ.createRabbitConnectionFactory();
 
         ReceiverOptions receiverOptions = new ReceiverOptions()
                 .connectionFactory(rabbitConnectionFactory)
@@ -39,7 +40,7 @@ public class DataRefineryServer {
 
         Driver driver = Neo4J.openDriver();
 
-        int BATCH_SIZE = 5_000;
+        int BATCH_SIZE = 500;
         RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(RABBITMQ_QUEUE_NAME)
                 .map(rabbitMsg -> new String(rabbitMsg.getBody()))
                 .bufferTimeout(BATCH_SIZE, Duration.ofSeconds(2))
@@ -71,15 +72,6 @@ public class DataRefineryServer {
         return Mono.just(result);
     }
 
-    //todo: Figure out where to read the connection information from
-    private static ConnectionFactory createRabbitConnectionFactory() {
-        ConnectionFactory rabbitConnectionFactory = new ConnectionFactory();
-        rabbitConnectionFactory.setHost("127.0.0.1");
-        rabbitConnectionFactory.setPort(RABBITMQ_PORT);
-        rabbitConnectionFactory.setUsername("menome");
-        rabbitConnectionFactory.setPassword("menome");
 
-        return rabbitConnectionFactory;
-    }
 
 }
