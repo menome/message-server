@@ -153,17 +153,6 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         0 == Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt()
     }
 
-    def "five symend messages"(){
-        given:
-        Driver driver = Neo4J.openDriver()
-        when:
-        List<String> symendMessages = buildSymendMessages(5)
-        MessageBatchResult result = MessageBatchProcessor.process(symendMessages, driver)
-
-        then:
-        5 == Neo4J.run(driver, "match (n:CollectionEvent) return count(n) as count").single().get("count").asInt()
-    }
-
     def "message with missing node type expect error tuple"() {
     }
 

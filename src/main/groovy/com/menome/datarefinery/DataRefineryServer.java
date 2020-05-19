@@ -14,8 +14,6 @@ import reactor.core.publisher.Mono;
 import reactor.rabbitmq.RabbitFlux;
 import reactor.rabbitmq.ReceiverOptions;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 
 public class DataRefineryServer {
@@ -40,7 +38,7 @@ public class DataRefineryServer {
 
         Driver driver = Neo4J.openDriver();
 
-        int BATCH_SIZE = 500;
+        int BATCH_SIZE = 5000;
         RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(RABBITMQ_QUEUE_NAME)
                 .map(rabbitMsg -> new String(rabbitMsg.getBody()))
                 .bufferTimeout(BATCH_SIZE, Duration.ofSeconds(2))
@@ -53,16 +51,8 @@ public class DataRefineryServer {
     }
 
     private static Mono<MessageBatchResult> logBatchResult(MessageBatchResult result) {
-        MessageBatchSummary batchSummary = result.getBatchSummary();
-        BigDecimal millis = new BigDecimal(batchSummary.getBatchProcessingDuration().toMillis());
-        BigDecimal successCount = new BigDecimal(batchSummary.getSuccessCount());
-        BigDecimal errorCount = new BigDecimal(batchSummary.getErrorCount());
-        if (millis.compareTo(BigDecimal.ZERO) == 0) {
-            millis = BigDecimal.ONE;
-        }
-        BigDecimal rate = successCount.divide(millis, 3,RoundingMode.HALF_EVEN).multiply(BigDecimal.valueOf(1000));
-        rate = rate.setScale(0,RoundingMode.HALF_EVEN);
-        log.info("Processed {} messages with {} errors in {} ms rate {} messages/s", successCount, errorCount, millis, rate);
+        MessageBatchSummary summary = result.getBatchSummary();
+        log.info("Processed {} messages with {} errors in {} ms rate {} messages/s", summary.getSuccessCount(), summary.getErrorCount(), summary.getBatchProcessingDuration().toMillis(), summary.getRate());
 
         if (result.getErrors().size() > 0) {
             result.getErrors().forEach(msg -> log.error(msg.getErrorText()));

@@ -1,6 +1,7 @@
 package com.menome.rabbitIntegration
 
-import com.menome.MessagingSpecification
+
+import com.menome.SymendMessagingSpecification
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.util.Neo4J
 import com.rabbitmq.client.AMQP
@@ -23,7 +24,7 @@ import java.util.concurrent.TimeUnit
 
 import static org.awaitility.Awaitility.await
 
-class RabbitMQVolumeSpecification extends MessagingSpecification {
+class RabbitMQVolumeSpecification extends SymendMessagingSpecification {
 
     static Logger log = LoggerFactory.getLogger(RabbitMQVolumeSpecification.class)
 
@@ -112,5 +113,29 @@ class RabbitMQVolumeSpecification extends MessagingSpecification {
         println(duration)
         println "Done..."
         sleep(1000000000)
+    }
+
+
+    def "write 250,000 symend messages to rabbit"(){
+        given:
+        rabbitConnectionFactory = createRabbitConnectionFactory()
+        metrics = new MicrometerMetricsCollector(new SimpleMeterRegistry())
+        rabbitConnectionFactory.setMetricsCollector(metrics)
+
+        def rabbitChannel = openRabbitMQChanel(RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY,rabbitConnectionFactory)
+        def messagesToWrite = 50_000
+
+        when:
+        (1..5).each {
+            def messages = buildSymendMessages(messagesToWrite,Integer.MAX_VALUE, Integer.MAX_VALUE)
+            messages.each { message ->
+                rabbitChannel.basicPublish(RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, null, message.getBytes())
+            }
+        }
+        await().atMost(2, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == 250_000 }
+        then:
+        1 == 1
+        println("Done...")
+
     }
 }
