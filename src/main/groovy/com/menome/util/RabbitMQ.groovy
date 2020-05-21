@@ -43,7 +43,7 @@ class RabbitMQ {
         try {
             def rabbitConnection = connectionFactory.newConnection()
             Channel rabbitChannel = rabbitConnection.createChannel()
-            rabbitChannel.queueBind(getQueue(),"test_exchange","test_route")
+            rabbitChannel.queueBind(getQueue(),getExchange(),"")
         } catch (Exception e) {
             ok = Boolean.FALSE
         }
@@ -60,5 +60,11 @@ class RabbitMQ {
 
     static Integer getBatchSize() {
         Optional.ofNullable(System.getenv("RABBITMQ_BATCHSZIE")).orElse("5000").toInteger()
+    }
+
+    //todo: It would be nice to get rid of the exchange declaration. The rabbit-reactor library seems to have a way of connecting to the queue without the exchange
+    static String getExchange() {
+        Optional.ofNullable(System.getenv("RABBITMQ_EXCHANGE")).orElse("test_exchange")
+        null
     }
 }
