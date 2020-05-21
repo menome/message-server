@@ -3,8 +3,7 @@ package com.menome.dataRefineryServer
 import com.menome.MessagingSpecification
 import com.menome.datarefinery.DataRefineryServer
 import com.menome.util.Neo4J
-import com.rabbitmq.client.impl.MicrometerMetricsCollector
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import spock.lang.IgnoreRest
 
 import java.util.concurrent.TimeUnit
 
@@ -13,6 +12,7 @@ import static org.awaitility.Awaitility.await
 class DataRefineryServerSpecification extends MessagingSpecification {
 
 
+    @IgnoreRest
     def "test 50 messages delivered over rabbit to server"() {
         given:
         DataRefineryServer.startServer()
@@ -47,8 +47,6 @@ class DataRefineryServerSpecification extends MessagingSpecification {
 
     void publishMessagesToRabbit(int messageCount) {
         def rabbitConnectionFactory = createRabbitConnectionFactory()
-        def metrics = new MicrometerMetricsCollector(new SimpleMeterRegistry())
-        rabbitConnectionFactory.setMetricsCollector(metrics)
 
         def rabbitChannel = openRabbitMQChanel(RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, rabbitConnectionFactory)
         (1..messageCount).each { it ->
@@ -61,8 +59,6 @@ class DataRefineryServerSpecification extends MessagingSpecification {
 
     void publishSymendMessagesToRabbit(List<String> messages) {
         def rabbitConnectionFactory = createRabbitConnectionFactory()
-        def metrics = new MicrometerMetricsCollector(new SimpleMeterRegistry())
-        rabbitConnectionFactory.setMetricsCollector(metrics)
 
         def rabbitChannel = openRabbitMQChanel(RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY, rabbitConnectionFactory)
         messages.each { message ->

@@ -1,43 +1,40 @@
 package com.menome.util
 
-
 import org.neo4j.driver.*
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 
 class Neo4J {
 
-    static final int NEO4J_BOLT_API_PORT = 7687
+    static Logger log = LoggerFactory.getLogger(Neo4J.class)
+
+    static Driver openDriver(GenericContainer neo4JContainer) {
+        def boltPortEnv = Optional.ofNullable(System.getenv("NEO4J_BOLT_PORT")).orElse("7687").toInteger()
+        String boltPort = neo4JContainer.getMappedPort(boltPortEnv)
+        String boltURL = "bolt://localhost:$boltPort"
+        return GraphDatabase.driver(boltURL, AuthTokens.basic("neo4j", "password"))
+    }
+
+    static Driver openDriver() {
+        def host = Optional.ofNullable(System.getenv("NEO4J_HOST")).orElse("localhost")
+        def boltPort = Optional.ofNullable(System.getenv("NEO4J_BOLT_PORT")).orElse("7687")
+        def username = Optional.ofNullable(System.getenv("NEO4J_USER")).orElse("neo4j")
+        def password = Optional.ofNullable(System.getenv("NEO4J_PASSWORD")).orElse("password")
+        String boltURL = "bolt://$host:$boltPort"
+        log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
+        return GraphDatabase.driver(boltURL, AuthTokens.basic(username, password))
+    }
+
 
     static Result run(Driver driver, String statement) {
         run(driver, statement, [:])
-    }
-
-    static Result run(Driver driver, List<String> statements, Map parameters) {
-        Session session = driver.session()
-        parameters.nodeParams = [:]
-        def result = null
-        statements.each() {
-            result = session.run(it, parameters)
-        }
-        result
     }
 
     static Result run(Driver driver, String statement, Map parameters) {
         Session session = driver.session()
         def result = session.run(statement, parameters)
         return result
-    }
-
-    static Driver openDriver(GenericContainer neo4JContainer) {
-        String boltPort = neo4JContainer.getMappedPort(NEO4J_BOLT_API_PORT) as String
-        String boltURL = "bolt://localhost:$boltPort"
-        return GraphDatabase.driver(boltURL, AuthTokens.basic("neo4j", "password"))
-    }
-
-    static Driver openDriver() {
-        String boltPort = NEO4J_BOLT_API_PORT as String
-        String boltURL = "bolt://localhost:$boltPort"
-        return GraphDatabase.driver(boltURL, AuthTokens.basic("neo4j", "password"))
     }
 
 

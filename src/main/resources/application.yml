@@ -1,0 +1,13 @@
+micronaut:
+  application:
+    name: messageServer
+  metrics:
+    enabled: true
+  endpoints:
+    all:
+      enabled: true
+      sensitive: false
+    stop:
+      enabled: false
+  server:
+    port: 8080

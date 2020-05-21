@@ -3,6 +3,7 @@ package com.menome
 import com.menome.messageBuilder.Connection
 import com.menome.messageBuilder.MessageBuilder
 import com.menome.rabbitIntegration.RabbitMQVolumeSpecification
+import com.menome.util.RabbitMQ
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.Logger
@@ -150,14 +151,13 @@ class MessagingSpecification extends Specification {
     }
 
     protected static ConnectionFactory createRabbitConnectionFactory() {
-        ConnectionFactory rabbitConnectionFactory = new ConnectionFactory()
-        rabbitConnectionFactory.host = "127.0.0.1"
-        rabbitConnectionFactory.port = RABBITMQ_PORT
-        rabbitConnectionFactory.username = "menome"
-        rabbitConnectionFactory.password = "menome"
-
-        return rabbitConnectionFactory
+        RabbitMQ.createRabbitConnectionFactory()
     }
+
+    protected static Channel openRabbitMQChanel(String queue, String exchange, String routingKey, ConnectionFactory rabbitConnectionFactory) {
+        return RabbitMQ.openRabbitMQChannel(queue,exchange,routingKey,rabbitConnectionFactory)
+    }
+
 
     protected static GenericContainer createAndStartRabbitMQContainer(Network network) {
         GenericContainer rabbitMQContainer = new GenericContainer("rabbitmq:management-alpine")
@@ -175,14 +175,4 @@ class MessagingSpecification extends Specification {
         return rabbitMQContainer
     }
 
-    protected static Channel openRabbitMQChanel(String queue, String exchange, String routingKey, ConnectionFactory rabbitConnectionFactory) {
-
-        com.rabbitmq.client.Connection rabbitConnection = rabbitConnectionFactory.newConnection()
-        Channel rabbitChannel = rabbitConnection.createChannel()
-        rabbitChannel.queueDeclare(queue, true, false, false, null)
-        rabbitChannel.exchangeDeclare(exchange, "topic", true)
-        rabbitChannel.queueBind(queue, exchange, routingKey)
-
-        return rabbitChannel
-    }
 }

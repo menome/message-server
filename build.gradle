@@ -1,48 +1,90 @@
-buildscript {
-    configurations {
-        classpath {
-            exclude group: 'ch.qos.logback', module: 'logback-classic'
-        }
-    }
-}
-
 plugins {
-    id 'groovy'
+    id "groovy"
+    id "com.github.johnrengelman.shadow" version "5.2.0"
+    id "application"
 }
 
-group 'com.todcostella.menome'
-version '1.0-SNAPSHOT'
+version "0.1"
+group "com.menome"
 
-sourceCompatibility = 11
 
 repositories {
     mavenCentral()
 }
 
-dependencies {
-    compile 'org.codehaus.groovy:groovy-all:2.5.8'
-    compile group: 'com.google.code.gson', name: 'gson', version: '2.8.5'
-    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.10'
-    compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.28'
-    compile 'com.rabbitmq:amqp-client:5.7.3'
-
-    compile group: 'org.neo4j', name: 'neo4j', version: '4.0.3'
-    compile 'org.neo4j.driver:neo4j-java-driver:4.0.1'
-
-    compile 'org.awaitility:awaitility-groovy:4.0.2'
-    compile group: 'io.micrometer', name: 'micrometer-core', version: '1.4.1'
-
-    compile "org.testcontainers:rabbitmq:1.12.3"
-    compile "org.testcontainers:spock:1.12.3"
-
-    compile group: 'io.projectreactor.rabbitmq', name: 'reactor-rabbitmq', version: '1.4.1.RELEASE'
-    testCompile group: 'io.projectreactor', name: 'reactor-test', version: '3.3.5.RELEASE'
-
-
-    //compile "org.testcontainers:neo4j:1.12.3"
-
-    testCompile group: 'junit', name: 'junit', version: '4.12'
-    testCompile "org.spockframework:spock-core:1.3-groovy-2.5"
-    testCompile files('lib/bot-testing-framework-2.0.jar')
+configurations {
+    // for dependencies that are needed for development only
+    developmentOnly
 }
+
+dependencies {
+    compileOnly(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion")){
+        exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
+    }
+    compileOnly("io.micronaut:micronaut-inject-groovy")
+    compileOnly("info.picocli:picocli-codegen:4.2.0")
+    implementation(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion")){
+        exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
+    }
+    implementation("io.micronaut:micronaut-inject")
+    implementation("io.micronaut:micronaut-validation")
+    implementation("io.micronaut:micronaut-runtime-groovy")
+    implementation("info.picocli:picocli")
+    implementation("io.micronaut.picocli:micronaut-picocli")
+    runtimeOnly("ch.qos.logback:logback-classic:1.2.3")
+    testImplementation enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion"){
+        exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
+    }
+    testImplementation("io.micronaut:micronaut-inject-groovy")
+    testImplementation("org.spockframework:spock-core") {
+        exclude group: "org.codehaus.groovy", module: "groovy-all"
+    }
+    testImplementation("io.micronaut.test:micronaut-test-spock")
+    implementation("io.micronaut:micronaut-http-server-netty")
+    implementation("io.micronaut:micronaut-management")
+
+    implementation("com.google.code.gson:gson:2.8.5")
+    //compile group: 'com.google.code.gson', name: 'gson', version: '2.8.5'
+
+    compile "io.micronaut.configuration:micronaut-micrometer-core"
+    implementation("io.micronaut.cache:micronaut-cache-core")
+
+    implementation("org.apache.commons:commons-lang3:3.10")
+    implementation("com.rabbitmq:amqp-client:5.7.3'")
+
+    implementation("org.neo4j:neo4j:4.0.3"){
+        exclude group: "org.slf4j", module: "slf4j-nop"
+    }
+    implementation('org.neo4j.driver:neo4j-java-driver:4.0.1')
+
+    implementation( "org.awaitility:awaitility-groovy:4.0.2")
+    implementation("org.testcontainers:rabbitmq:1.12.3")
+    implementation("org.testcontainers:spock:1.12.3")
+    implementation("io.projectreactor.rabbitmq:reactor-rabbitmq:1.4.1.RELEASE")
+    implementation("io.projectreactor:reactor-test:3.3.5.RELEASE")
+}
+
+test.classpath += configurations.developmentOnly
+
+mainClassName = "com.menome.MessageServerCommand"
+
+java {
+    sourceCompatibility = JavaVersion.toVersion('1.8')
+    targetCompatibility = JavaVersion.toVersion('1.8')
+}
+
+tasks.withType(GroovyCompile) {
+    groovyOptions.forkOptions.jvmArgs.add('-Dgroovy.parameters=true')
+}
+
+shadowJar {
+    mergeServiceFiles()
+}
+
+tasks.withType(JavaExec) {
+    classpath += configurations.developmentOnly
+    jvmArgs('-XX:TieredStopAtLevel=1', '-Dcom.sun.management.jmxremote')
+}
+
+
 
