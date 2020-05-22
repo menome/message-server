@@ -1,9 +1,13 @@
 package com.menome.util
 
 import org.neo4j.driver.*
+import org.neo4j.driver.internal.logging.JULogging
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
+
+import java.util.logging.Level
+
 
 class Neo4J {
 
@@ -13,7 +17,8 @@ class Neo4J {
         def boltPortEnv = Optional.ofNullable(System.getenv("NEO4J_BOLT_PORT")).orElse("7687").toInteger()
         String boltPort = neo4JContainer.getMappedPort(boltPortEnv)
         String boltURL = "bolt://localhost:$boltPort"
-        return GraphDatabase.driver(boltURL, AuthTokens.basic("neo4j", "password"))
+        def build = Config.builder().withLogging(new JULogging(Level.OFF)).build()
+        return GraphDatabase.driver(boltURL, AuthTokens.basic("neo4j", "password"), build)
     }
 
     static Driver openDriver() {
@@ -23,7 +28,9 @@ class Neo4J {
         def password = Optional.ofNullable(System.getenv("NEO4J_PASSWORD")).orElse("password")
         String boltURL = "bolt://$host:$boltPort"
         log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
-        return GraphDatabase.driver(boltURL, AuthTokens.basic(username, password))
+        Config config = Config.builder().withLogging(new JULogging(Level.WARNING)).build()
+        Driver driver = GraphDatabase.driver(boltURL, AuthTokens.basic(username, password), config)
+        return driver
     }
 
 

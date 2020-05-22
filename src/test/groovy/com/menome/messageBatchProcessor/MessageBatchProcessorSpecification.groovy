@@ -17,6 +17,8 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         def driver = Neo4J.openDriver()
         Neo4J.run(driver, "match (n) detach delete n")
         await().atMost(1, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0 }
+
+        driver.close()
     }
 
 
@@ -27,6 +29,8 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         expect:
         3 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
         3 == Neo4J.run(driver, "match (e:Employee)-[w:WorkedOnProject]-(p:Project) return count(e) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
     }
 
     def "two messages of different types"() {
@@ -36,6 +40,9 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         expect:
         1 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
         1 == Neo4J.run(driver, "match (m:Meeting) return count(m) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
+
     }
 
     def "batch of one valid message"() {
@@ -44,6 +51,9 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         MessageBatchProcessor.process(List.of(victoriaEmployee), driver)
         expect:
         1 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
+
     }
 
     def "batch of one simple message"() {
@@ -52,6 +62,9 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         MessageBatchProcessor.process(List.of(simpleMessage), driver)
         expect:
         1 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
+
     }
 
     def "batch of three valid one invalid"() {
@@ -62,6 +75,9 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         MessageBatchProcessor.process(messages, driver)
         expect:
         3 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
+
     }
 
     def "batch of two valid one corrupted message"() {
@@ -72,6 +88,9 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         MessageBatchProcessor.process(messages, driver)
         expect:
         2 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
+
     }
 
 
@@ -86,6 +105,9 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         result.batchSummary.errorCount == 1
         invalidMessage == result.errors[0].message
         0 == Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
+
     }
 
     def "indexes created as expected from employee message"() {
@@ -98,6 +120,9 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         then:
         checkIfIndexExistsInRecordSet(records, ["Employee"], ["Email", "EmployeeId"])
         checkIfIndexExistsInRecordSet(records, ["Card"], ["Email", "EmployeeId"])
+        cleanup:
+        driver.close()
+
     }
 
 
@@ -110,7 +135,8 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         then:
         result.batchSummary
         !result.errors
-        log.info(result.toString())
+        cleanup:
+        driver.close()
     }
 
     def "seven messages with two errors"() {
@@ -127,6 +153,8 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         result.batchSummary.errorCount == 2
         result.errors.size() == 2
         5 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
     }
 
     def "batch with multiple connections of same type different values"(){
@@ -138,6 +166,8 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         2 == Neo4J.run(driver, "match(o:Office) return count(o) as count").single().get("count").asInt()
         1 == Neo4J.run(driver, "match(o:Office) where o.City=\"Victoria\" return count(o) as count").single().get("count").asInt()
         1 == Neo4J.run(driver, "match(o:Office) where o.City=\"Calgary\" return count(o) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
     }
 
     def "error expected from bad connection node"(){
@@ -151,6 +181,9 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         result.batchSummary.errorCount == 1
         validMessageWithInvalidConnection == result.errors[0].message
         0 == Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt()
+        cleanup:
+        driver.close()
+
     }
 
     def "message with missing node type expect error tuple"() {
@@ -175,6 +208,4 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         }
         return rc
     }
-
-
 }
