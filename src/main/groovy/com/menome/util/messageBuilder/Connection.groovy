@@ -1,4 +1,4 @@
-package com.menome.messageBuilder
+package com.menome.util.messageBuilder
 
 import com.google.gson.annotations.SerializedName
 import groovy.transform.builder.Builder

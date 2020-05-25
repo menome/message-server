@@ -1,4 +1,4 @@
-package com.menome.messageBuilder
+package com.menome.util.messageBuilder
 
 
 import spock.lang.Specification

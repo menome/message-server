@@ -1,7 +1,7 @@
 package com.menome
 
-import com.menome.messageBuilder.Connection
-import com.menome.messageBuilder.MessageBuilder
+import com.menome.util.messageBuilder.Connection
+import com.menome.util.messageBuilder.MessageBuilder
 
 import java.time.Instant
 

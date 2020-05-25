@@ -63,7 +63,25 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         List<String> statements = processPrimaryNodeMergeForMessageWithConnections()
         expect:
+        statements.each(){
+            log.info(it)
+        }
         statements.size() == 7
+    }
+
+    def "process all statements for message with connections"(){
+        given:
+        Neo4JStatements statements = processMessage(victoriaEmployee)
+        expect:
+        statements.indexes.each(){
+            println it
+        }
+        statements.connectionMerge.each(){
+            println it
+        }
+        statements.primaryNodeMerge.each(){
+            println it
+        }
     }
 
     def "process indexes from simple message"() {

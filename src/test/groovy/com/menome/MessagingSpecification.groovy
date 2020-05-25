@@ -1,9 +1,9 @@
 package com.menome
 
-import com.menome.messageBuilder.Connection
-import com.menome.messageBuilder.MessageBuilder
 import com.menome.rabbitIntegration.RabbitMQVolumeSpecification
 import com.menome.util.RabbitMQ
+import com.menome.util.messageBuilder.Connection
+import com.menome.util.messageBuilder.MessageBuilder
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.Logger
