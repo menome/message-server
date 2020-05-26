@@ -6,6 +6,7 @@ import org.neo4j.driver.Driver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
+import spock.lang.Ignore
 
 import java.time.Duration
 import java.util.concurrent.TimeUnit
@@ -84,32 +85,38 @@ class MessageBatchPerformanceSpecification extends SymendMessagingSpecification 
         testMessageCreate(500, Integer.MAX_VALUE, Integer.MAX_VALUE)
     }
 
+    @Ignore
     def "fifty thousand nodes with no connections"() {
         expect:
         testMessageCreate(50_000, 0, 0)
     }
 
+    @Ignore
     def "fifty thousand nodes with no connections all properties"() {
         expect:
         testMessageCreate(50_000, 0, Integer.MAX_VALUE)
     }
 
+    @Ignore
     def "fifty thousand nodes with one connection all properties"() {
         expect:
         testMessageCreate(50_000, 1, Integer.MAX_VALUE)
     }
 
+    @Ignore
     def "fifty thousand nodes with two connections all properties"() {
         expect:
         testMessageCreate(50_000, 2, Integer.MAX_VALUE)
     }
 
+    @Ignore
     def "fifty thousand nodes with three connections all properties"() {
         expect:
         testMessageCreate(50_000, 3, Integer.MAX_VALUE)
     }
 
 
+    @Ignore
     def "fifty thousand nodes with one connections and reference data created"() {
         given:
         Driver driver = Neo4J.openDriver()
@@ -120,6 +127,7 @@ class MessageBatchPerformanceSpecification extends SymendMessagingSpecification 
         1 == 1
     }
 
+    @Ignore
     def "fifty thousand nodes with two connections and reference data created"() {
         given:
         Driver driver = Neo4J.openDriver()
@@ -130,6 +138,7 @@ class MessageBatchPerformanceSpecification extends SymendMessagingSpecification 
         1 == 1
     }
 
+    @Ignore
     def "fifty thousand nodes with three connections and reference data created"() {
         given:
         Driver driver = Neo4J.openDriver()

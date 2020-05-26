@@ -1,6 +1,5 @@
 package com.menome.rabbitIntegration
 
-
 import com.menome.SymendMessagingSpecification
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.util.Neo4J
@@ -14,7 +13,7 @@ import org.neo4j.driver.Driver
 import org.neo4j.driver.Session
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.testcontainers.containers.GenericContainer
+import spock.lang.Ignore
 import spock.lang.Shared
 
 import java.text.SimpleDateFormat
@@ -32,13 +31,7 @@ class RabbitMQVolumeSpecification extends SymendMessagingSpecification {
     static ConnectionFactory rabbitConnectionFactory
 
     @Shared
-    static GenericContainer rabbitMQContainer
-
-    @Shared
     static MicrometerMetricsCollector metrics
-
-    @Shared
-    GenericContainer neo4JContainer
 
     @Shared
     Driver neo4JDriver
@@ -50,6 +43,7 @@ class RabbitMQVolumeSpecification extends SymendMessagingSpecification {
         rabbitConnectionFactory.setMetricsCollector(metrics)
     }
 
+    @Ignore
     def "write for server"() {
         given:
         rabbitConnectionFactory = createRabbitConnectionFactory()
@@ -71,6 +65,7 @@ class RabbitMQVolumeSpecification extends SymendMessagingSpecification {
         println("Done...")
     }
 
+    @Ignore
     def "write 5000 messages to rabbit"() {
         given:
         def rabbitChannel = openRabbitMQChanel(RABBITMQ_QUEUE_NAME, RABBITMQ_TEST_EXCHANGE, RABBITMQ_TEST_ROUTING_KEY,rabbitConnectionFactory)
@@ -116,6 +111,7 @@ class RabbitMQVolumeSpecification extends SymendMessagingSpecification {
     }
 
 
+    @Ignore
     def "write 250,000 symend messages to rabbit"(){
         given:
         rabbitConnectionFactory = createRabbitConnectionFactory()
