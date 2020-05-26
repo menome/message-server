@@ -99,14 +99,75 @@ At a high level, the system reads messages from a Rabbit MQ queue, collects the 
 ![Component Diagram](doc/assets/Component Diagram.png)
 
 ### Message Server
-The MessageServer (com.menome.MessageServerCommand) is the main entry point for the system. It can be launched from the command line, through an iIDE (IntelliJ for example) or packaged into a docker container. 
+The MessageServer (com.menome.MessageServerCommand) is the main entry point for the system. It can be launched from the command line, through an iIDE (IntelliJ for example) or packaged into a docker container.
+
+When the server starts, it will check to ensure it can connect to both Rabbit MQ and Neo4J. Status messages are  logged to standard out via the Logback logging framework at INFO level.  Here is a typical startup sequence:
+
+```
+10:43:40.149 [main] INFO  i.m.context.env.DefaultEnvironment - Established active environments: [cli]
+10:43:40.587 [main] INFO  c.m.datarefinery.DataRefineryServer -  __  __
+10:43:40.588 [main] INFO  c.m.datarefinery.DataRefineryServer - |  \/  | ___ _ __   ___  _ __ ___   ___
+10:43:40.588 [main] INFO  c.m.datarefinery.DataRefineryServer - | |\/| |/ _ \ '_ \ / _ \| '_ ` _ \ / _ \
+10:43:40.588 [main] INFO  c.m.datarefinery.DataRefineryServer - | |  | |  __/ | | | (_) | | | | | |  __/
+10:43:40.588 [main] INFO  c.m.datarefinery.DataRefineryServer - |_|  |_|\___|_| |_|\___/|_| |_| |_|\___|
+10:43:40.588 [main] INFO  c.m.datarefinery.DataRefineryServer - Starting Server
+10:43:40.588 [main] INFO  c.m.datarefinery.DataRefineryServer - Starting Monitoring Services
+10:43:40.887 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 292ms. Server Running: http://localhost:8080
+10:43:40.915 [main] INFO  com.menome.util.RabbitMQ - Connecting to RabbitMQ server 127.0.0.1 on port 5672 with user menome
+10:43:40.965 [main] INFO  c.m.datarefinery.DataRefineryServer - Connected to Rabbit MQ Server OK
+10:43:40.986 [main] INFO  com.menome.util.Neo4J - Connecting to Neo4J server bolt://localhost:7687 with user neo4j
+10:43:41.194 [main] INFO  c.m.datarefinery.DataRefineryServer - Connected to Neo4J Database Server OK - version:4.0.4 edition:community
+10:43:41.201 [main] INFO  c.m.datarefinery.DataRefineryServer - Message Server waiting for messages on queue test_queue processing messages with a batch size of 5000
+10:43:41.267 [main] INFO  c.m.datarefinery.DataRefineryServer - Server Started
+10:43:41.278 [rabbitmq-receiver-connection-subscription-2] INFO  reactor.rabbitmq.Receiver - Consumer amq.ctag-cp44adLvVKbIvBXYyKrSCg consuming from test_queue has been registered
+```
+
+A couple of things to note
+- The monitoring server starts first. it's the one running at port 8080 above.
+- The rabbit connection is established next. If successful it will display Connected to Rabbit MQ Server OK 
+- The Neo4J connection is established next. If successful it will display Connected to Neo4J Datbase Server Ok with the version and edition of the Neo4J instance.
+- Finally, the queue the server is listening on, and the batch size has been configured are displayed.
+
+The server sets up a Reactive stream to listen for messages on the Rabbit queue. 
+
+```groovy
+        RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.rabbitMQQueue)
+                .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
+                .bufferTimeout(ApplicationConfiguration.rabbitMQBatchSize, Duration.ofSeconds(2))
+                .map({ messages -> MessageBatchProcessor.process(messages, driver) })
+                .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
+                .subscribe()
+```
+
+Messages flow in, their contents are pulled out into Strings.
+The buffer fills until the batch size is met or two seconds have elapsed.
+The batch is sent to the MessageMatchProcessor
+The results are logged 
 
 TODO: Command line example with system properties and/or properties files.
  
+### Message Batch Processor 
+The message batch processor takes a batch of messages (currently an Arraylist<String>). Messages are grouped into maps of the same type. This is to ensure we can apply the same parameter type across all messages. In many cases the batch will have exactly the same message types, but we can't be guaranteed of that.
 
-### Message Batch Processor
+The messages in each sub batch are processed. 
+- Indexes for the nodes in the batch are created if they are not present in the database.
+- Connection nodes are merged. This is an optimization that assumes that the cardinality between primary nodes and their connections is low. That is to say, if we have connections to things like code descriptions or cities, there will be fewer of them than the primary nodes we are inserting. Merging them once instead of for each statement is efficient.  
+- Parameters for each of the primary nodes are collected into a list. An UNWIND is prepended to the primary node merge and the batch is sent off to Neo4J.
+
+#### Error Handling
+One of the interesting aspects to this approach is what happens if there is an error or multiple errors in the batch? The batch is processed in a single transaction and as such, the entire batch will be rolled back. This is not ideal, we want to identify the messages that failed but let the valid ones proceed. When an error in a batch is detected, the batch is split in two and then each subset of the batch is processed again. This splitting happens until the batch size is one which will contain the invalid message. This approach was inspired by Git bisect.
+ 
 ### Message Processor
+The message processor converts the JSon formatted messages into Neo4J cypher statements. There are three different types of statements that get created from a single message. 
+- Create indexes for the primary node
+- Merges for the connection node
+- Merge and relationships to the connection nodes from the primary node.
+
+There really isn't anything remarkable about this class. Lots of map processing, string manipulation etc. It is the heart of the approach and gets called for every message that the system consumes. Attempts have been made to make the methods as efficient as they can be. Likely more can be done here however it's not uncommon for a message to be processed in a few milliseconds. The bulk of the time is Neo4J processing the batches.
+
 ### Utility Classes
+Neo4J - contains methods for establishing connections to and running cypher statements against the Neo4J database
+RabbitMQ - contains methods for establishing connections to the Rabbit MQ message bus.
 
 
 ##Technology
@@ -116,6 +177,7 @@ Spock
 Micronaut
 Reactor
 Picocli
+LogBack
 RabbitMQ
 Neo4J
 Docker
