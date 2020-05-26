@@ -55,7 +55,7 @@ class RabbitMQ {
     }
 
     static String getHost() {
-        Optional.ofNullable(System.getenv("RABBITMQ_HOST")).orElse("localhost")
+        Optional.ofNullable(System.getenv("RABBITMQ_HOST")).orElse("127.0.0.1")
     }
 
     static Integer getBatchSize() {
@@ -65,6 +65,5 @@ class RabbitMQ {
     //todo: It would be nice to get rid of the exchange declaration. The rabbit-reactor library seems to have a way of connecting to the queue without the exchange
     static String getExchange() {
         Optional.ofNullable(System.getenv("RABBITMQ_EXCHANGE")).orElse("test_exchange")
-        null
     }
 }
