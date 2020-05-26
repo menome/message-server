@@ -4,6 +4,7 @@ import com.menome.datarefinery.DataRefineryServer
 import com.menome.messageBatchProcessor.MessageBatchProcessor
 import com.menome.messageBatchProcessor.MessageBatchResult
 import com.menome.messageBatchProcessor.MessageBatchSummary
+import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
 import com.menome.util.RabbitMQ
 import com.rabbitmq.client.Address
@@ -58,14 +59,14 @@ class MessageServerCommand implements Runnable {
 
         ReceiverOptions receiverOptions = new ReceiverOptions()
                 .connectionFactory(rabbitConnectionFactory)
-                .connectionSupplier({ cf -> cf.newConnection([new Address(RabbitMQ.host)], RabbitMQ.queue) })
+                .connectionSupplier({ cf -> cf.newConnection([new Address(ApplicationConfiguration.rabbitMQHost)], ApplicationConfiguration.rabbitMQQueue) })
 
 
 
-        log.info("Message Server waiting for messages on queue {} processing messages with a batch size of {}", RabbitMQ.queue, RabbitMQ.batchSize)
-        RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(RabbitMQ.queue)
+        log.info("Message Server waiting for messages on queue {} processing messages with a batch size of {}", ApplicationConfiguration.rabbitMQQueue, ApplicationConfiguration.rabbitMQBatchSize)
+        RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.rabbitMQQueue)
                 .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
-                .bufferTimeout(RabbitMQ.batchSize, Duration.ofSeconds(2))
+                .bufferTimeout(ApplicationConfiguration.rabbitMQBatchSize, Duration.ofSeconds(2))
                 .map({ messages -> MessageBatchProcessor.process(messages, driver) })
                 .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
                 .subscribe()

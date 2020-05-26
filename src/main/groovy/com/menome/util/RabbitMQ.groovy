@@ -14,10 +14,10 @@ class RabbitMQ {
 
     static ConnectionFactory createRabbitConnectionFactory() {
         ConnectionFactory rabbitConnectionFactory = new ConnectionFactory()
-        def host = getHost()
-        def port = Optional.ofNullable(System.getenv("RABBITMQ_PORT")).orElse("5672").toInteger()
-        def username = Optional.ofNullable(System.getenv("RABBITMQ_USER")).orElse("menome")
-        def password = Optional.ofNullable(System.getenv("RABBITMQ_PASSWORD")).orElse("menome")
+        def host = ApplicationConfiguration.rabbitMQHost
+        def port = ApplicationConfiguration.rabbitMQPort
+        def username = ApplicationConfiguration.rabbitMQUsername
+        def password = ApplicationConfiguration.rabbitMQPassword
         rabbitConnectionFactory.host = host
         rabbitConnectionFactory.port = port
         rabbitConnectionFactory.username = username
@@ -43,27 +43,10 @@ class RabbitMQ {
         try {
             def rabbitConnection = connectionFactory.newConnection()
             Channel rabbitChannel = rabbitConnection.createChannel()
-            rabbitChannel.queueBind(getQueue(),getExchange(),"")
+            rabbitChannel.queueBind(ApplicationConfiguration.rabbitMQQueue,ApplicationConfiguration.rabbitMQExchange,"")
         } catch (Exception e) {
             ok = Boolean.FALSE
         }
         ok
-    }
-
-    static String getQueue(){
-        Optional.ofNullable(System.getenv("RABBITMQ_QUEUE")).orElse("test_queue")
-    }
-
-    static String getHost() {
-        Optional.ofNullable(System.getenv("RABBITMQ_HOST")).orElse("127.0.0.1")
-    }
-
-    static Integer getBatchSize() {
-        Optional.ofNullable(System.getenv("RABBITMQ_BATCHSZIE")).orElse("5000").toInteger()
-    }
-
-    //todo: It would be nice to get rid of the exchange declaration. The rabbit-reactor library seems to have a way of connecting to the queue without the exchange
-    static String getExchange() {
-        Optional.ofNullable(System.getenv("RABBITMQ_EXCHANGE")).orElse("test_exchange")
     }
 }

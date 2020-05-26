@@ -14,23 +14,23 @@ class Neo4J {
     static Logger log = LoggerFactory.getLogger(Neo4J.class)
 
     static Driver openDriver(GenericContainer neo4JContainer) {
-        def boltPortEnv = Optional.ofNullable(System.getenv("NEO4J_BOLT_PORT")).orElse("7687").toInteger()
+        def host = ApplicationConfiguration.neo4JHost
+        def boltPortEnv = ApplicationConfiguration.neo4JBoltPort.toInteger()
         String boltPort = neo4JContainer.getMappedPort(boltPortEnv)
-        String boltURL = "bolt://localhost:$boltPort"
+        String boltURL = "bolt://$host:$boltPort"
         def build = Config.builder().withLogging(new JULogging(Level.OFF)).build()
-        return GraphDatabase.driver(boltURL, AuthTokens.basic("neo4j", "password"), build)
+        GraphDatabase.driver(boltURL, AuthTokens.basic(ApplicationConfiguration.neo4JUsername, ApplicationConfiguration.neo4JPassword), build)
     }
 
     static Driver openDriver() {
-        def host = Optional.ofNullable(System.getenv("NEO4J_HOST")).orElse("localhost")
-        def boltPort = Optional.ofNullable(System.getenv("NEO4J_BOLT_PORT")).orElse("7687")
-        def username = Optional.ofNullable(System.getenv("NEO4J_USER")).orElse("neo4j")
-        def password = Optional.ofNullable(System.getenv("NEO4J_PASSWORD")).orElse("password")
+        def host = ApplicationConfiguration.neo4JHost
+        def boltPort = ApplicationConfiguration.neo4JBoltPort
+        def username = ApplicationConfiguration.neo4JUsername
+        def password = ApplicationConfiguration.neo4JPassword
         String boltURL = "bolt://$host:$boltPort"
         log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
         Config config = Config.builder().withLogging(new JULogging(Level.WARNING)).build()
-        Driver driver = GraphDatabase.driver(boltURL, AuthTokens.basic(username, password), config)
-        return driver
+        GraphDatabase.driver(boltURL, AuthTokens.basic(username, password), config)
     }
 
 
