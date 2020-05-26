@@ -88,12 +88,27 @@ Given the two principals of immutability and pure functions the goal is not to h
 
 ####Test Driven
 There are a number of tests that validate the correctness of the implementation. They were developed in concert with the code. In many cases, tests were written before the implementation. Tests are implemented using the Spock BDD framework (http://spockframework.org/) 
+
+
+##Technology
+
+- JVM (Open JDK Version 11.0.4) (https://openjdk.java.net/)
+- Groovy (Version:2.5.x) (https://groovy-lang.org/)
+- Micronaut (Version 2.0.0 M1) (https://micronaut.io/)
+- Project Reactor (https://projectreactor.io/)
+- RabbitMQ (https://www.rabbitmq.com/)
+- Neo4J (https://neo4j.com/)
+- Docker (https://www.docker.com/)
+
+Testing
+- Spock (http://spockframework.org/)
+- Test Containers (https://www.testcontainers.org/)
         
 
 ## Solution Overview
 The message processing solution consists of three primary classes, a few utility classes and tests in the form of Spock specifications. This section describes each of the major components, how they relate and anything significant about them. 
 
-At a high level, the system reads messages from a Rabbit MQ queue, collects the message stream into batches, converts each entry in the batch to a series of Neo43J Cypher statements and applies the batch in a single transaction to update the graph database.
+At a high level, the system reads messages from a Rabbit MQ queue, collects the message stream into batches, converts each entry in the batch to a series of Neo4J Cypher statements and applies the batch in a single transaction to update the graph database.
 
 
 ![Component Diagram](doc/assets/Component Diagram.png)
@@ -131,12 +146,12 @@ A couple of things to note
 The server sets up a Reactive stream to listen for messages on the Rabbit queue. 
 
 ```groovy
-        RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.rabbitMQQueue)
-                .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
-                .bufferTimeout(ApplicationConfiguration.rabbitMQBatchSize, Duration.ofSeconds(2))
-                .map({ messages -> MessageBatchProcessor.process(messages, driver) })
-                .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
-                .subscribe()
+RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.rabbitMQQueue)
+        .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
+        .bufferTimeout(ApplicationConfiguration.rabbitMQBatchSize, Duration.ofSeconds(2))
+        .map({ messages -> MessageBatchProcessor.process(messages, driver) })
+        .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
+        .subscribe()
 ```
 
 Messages flow in, their contents are pulled out into Strings.
@@ -166,30 +181,74 @@ The message processor converts the JSon formatted messages into Neo4J cypher sta
 There really isn't anything remarkable about this class. Lots of map processing, string manipulation etc. It is the heart of the approach and gets called for every message that the system consumes. Attempts have been made to make the methods as efficient as they can be. Likely more can be done here however it's not uncommon for a message to be processed in a few milliseconds. The bulk of the time is Neo4J processing the batches.
 
 ### Utility Classes
-Neo4J - contains methods for establishing connections to and running cypher statements against the Neo4J database
+Neo4J - contains methods for establishing connections to and running cypher statements against the Neo4J database.
+
 RabbitMQ - contains methods for establishing connections to the Rabbit MQ message bus.
 
+## How to Build/Run 
 
-##Technology
-JVM (Java Version 11.x)
-Groovy (Version:)
-Spock
-Micronaut
-Reactor
-Picocli
-LogBack
-RabbitMQ
-Neo4J
-Docker
-Kubernetes
-Test Containers
+Ensure you have a JDK installed. I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
+
+Execute the following from the command line
+
+```shell script
+./gradlew build
+```
+----
+
+To run the tests execute:
+
+*** WARNING ***
+
+These tests will remove all nodes and relationships from the target NEO4J database DO NOT run these against a production configuration.
+
+*** WARNING ***
 
 
+```shell script
+./gradlew test
+```
 
+You can review the results of the test run by opening the index.html file found at build/reports/tests/test/index.html
+
+----
+To start the server and have it listen for Rabbit messages on the queue
+
+```shell script
+./gradlew run
+```
+
+NOTE:
+You will see the following warning:
+
+```shell script
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by org.codehaus.groovy.reflection.CachedClass (file:/home/todd/.gradle/caches/modules-2/files-2.1/org.codehaus.groovy/groovy/2.5.10/e02047a2de591492cb19e82c9a72bd9d24b25235/groovy-2.5.10.jar) to method java.lang.Object.finalize()
+WARNING: Please consider reporting this to the maintainers of org.codehaus.groovy.reflection.CachedClass
+WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+WARNING: All illegal access operations will be denied in a future release
+```
+
+This is due to the requirement to use Groovy 2.x with Micronaut. This warning is coming from the Java 11 JRE and relates to the Groovy compiler reaching across new module boundaries that were introduced in Java 9. It has been resolved in Groovy 3. Unfortunately Micronaut doesn't support Groovy 3 (yet). Once that's resolved the dependencies will be updated and this annoying message will go away.
 
 
 ## Environment/Configuration Variables
+These are the environment variables that are used by the message server to configure the connections to Rabbit MQ and Neo4J. See the ApplicationConfiguration class for the implementation.
 
+|Environment Variable| Default Value    |
+|---                 |---               |
+|RABBITMQ_HOST       |127.0.0.1         |
+|RABBITMQ_PORT       |5672              |
+|RABBITMQ_USER       |menome            |
+|RABBITMQ_PASSWORD   |menome            |
+|RABBITMQ_QUEUE      |test_queue        |
+|RABBITMQ_BATCHSZIE  |5000              |
+|RABBITMQ_EXCHANGE   |test_exchange     |
+|                    |                  |
+|NEO4J_HOST          |localhost         |
+|NEO4J_BOLT_PORT     |7687              |
+|NEO4J_USER          |neo4j             |
+|NEO4J_PASSWORD      |password          |
 
 
 ## Resources
