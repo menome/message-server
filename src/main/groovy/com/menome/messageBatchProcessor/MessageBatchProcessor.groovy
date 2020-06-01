@@ -17,7 +17,7 @@ class MessageBatchProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
 
-    static MessageBatchResult process(List<String> messages, Driver driver, MessageBatchConfiguration configuration) {
+    static MessageBatchResult process(List<String> messages, Driver driver) {
 
         log.debug(Thread.currentThread().getName() + " " + messages.size())
         StopWatch timer = new StopWatch()
@@ -32,9 +32,7 @@ class MessageBatchProcessor {
         messagesByNodeType.each { nodeType, msgs ->
             Neo4JStatements statements = MessageProcessor.process(msgs.get(0))
             processIndexes(msgs, driver)
-            if(configuration.createRelationshipNodes) {
-                errors.addAll(processConnectionMerges(msgs, statements, driver))
-            }
+            errors.addAll(processConnectionMerges(msgs, statements, driver))
             errors.addAll(processPrimaryNodeMerges(msgs, statements, driver))
         }
         timer.stop()
@@ -43,9 +41,6 @@ class MessageBatchProcessor {
         new MessageBatchResult(batchSummary, errors)
     }
 
-    static MessageBatchResult process(List<String> messages, Driver driver) {
-        process(messages, driver, new MessageBatchConfiguration(true))
-    }
 
     private static Tuple2<Map<String, List<String>>, List<MessageError>> groupMessagesByNodeType(List<String> messages) {
         Map<String, List<String>> messagesByNodeType = [:]

@@ -1,6 +1,6 @@
 package com.menome
 
-import com.menome.rabbitIntegration.RabbitMQVolumeSpecification
+
 import com.menome.util.RabbitMQ
 import com.menome.util.messageBuilder.Connection
 import com.menome.util.messageBuilder.MessageBuilder
@@ -21,12 +21,6 @@ class MessagingSpecification extends Specification {
     protected static final int NEO4J_BOLT_API_PORT = 7687
     protected static final int NEO4J_WEB_PORT = 7474
 
-    protected static final int RABBITMQ_PORT = 5672
-    protected static final int RABBITMQ_MANAGEMENT_PORT = 15672
-
-    protected static final String RABBITMQ_TEST_EXCHANGE = "test_exchange"
-    protected static final String RABBITMQ_TEST_ROUTING_KEY = "test_route"
-    protected static final String RABBITMQ_QUEUE_NAME = "test_queue"
 
     static Logger log = LoggerFactory.getLogger(MessagingSpecification.class)
 
@@ -159,6 +153,7 @@ class MessagingSpecification extends Specification {
     }
 
 
+/*
     protected static GenericContainer createAndStartRabbitMQContainer(Network network) {
         GenericContainer rabbitMQContainer = new GenericContainer("rabbitmq:management-alpine")
                 .withNetwork(network)
@@ -174,5 +169,6 @@ class MessagingSpecification extends Specification {
 
         return rabbitMQContainer
     }
+*/
 
 }
