@@ -1,6 +1,6 @@
 package com.menome.messageBatchProcessor
 
-
+import com.google.gson.Gson
 import com.menome.messageProcessor.InvalidMessageException
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.messageProcessor.Neo4JStatements
@@ -36,6 +36,13 @@ class MessageBatchProcessor {
             errors.addAll(processPrimaryNodeMerges(msgs, statements, driver))
         }
         timer.stop()
+
+        if (log.isDebugEnabled()) {
+            errors.each() { error ->
+                log.debug(error.errorText)
+            }
+        }
+
 
         def batchSummary = new MessageBatchSummary(messages.size(), errors.size(), Duration.ofMillis(timer.getTime(TimeUnit.MILLISECONDS)))
         new MessageBatchResult(batchSummary, errors)
@@ -84,7 +91,11 @@ class MessageBatchProcessor {
         String unwind = "UNWIND \$parms AS param " + statement
         Map parameters = ["parms": nodeParameters]
 
-        log.debug(unwind)
+        if (log.isDebugEnabled()) {
+            log.debug(unwind)
+            log.debug(new Gson().toJson(parameters))
+        }
+
         try {
             Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
         } catch (Exception e) {

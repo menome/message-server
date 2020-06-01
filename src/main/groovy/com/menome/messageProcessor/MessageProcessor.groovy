@@ -17,7 +17,7 @@ class MessageProcessor {
             List<String> indexes = processIndexes(msgMap)
             List<String> connectionMerges = processConnectionMerges(msgMap)
             List<String> connectionMatches = processConnectionMatches(msgMap)
-            statements = new Neo4JStatements(primaryNodeMerge,indexes,connectionMerges,connectionMatches)
+            statements = new Neo4JStatements(primaryNodeMerge, indexes, connectionMerges, connectionMatches)
         }
         statements
     }
@@ -34,12 +34,6 @@ class MessageProcessor {
     static Map<String, String> processPrimaryNodeParametersAsMap(String msg) {
         if (msg) {
             processPrimaryNodeParametersAsMap(buildMapFromJSONString(msg))
-        }
-    }
-
-    static String processPrimaryNodeParametersAsJSON(String msg) {
-        if (msg) {
-            new Gson().toJson(processPrimaryNodeParametersAsMap(buildMapFromJSONString(msg)))
         }
     }
 
@@ -70,7 +64,7 @@ class MessageProcessor {
     }
 
     static Map<String, String> processPrimaryNodeParametersAsMap(Map msgMap) {
-        flattenMessageMap(msgMap, true)
+         flattenMessageMap(msgMap, true, true)
     }
 
 
@@ -87,7 +81,7 @@ class MessageProcessor {
         paramMap
     }
 
-    private static HashMap flattenMessageMap(Map msgMap, boolean includeConformedDimensions) {
+    private static HashMap flattenMessageMap(Map msgMap, boolean includeConformedDimensions, boolean includeProperties) {
         def flattenedMap = new HashMap(msgMap)
         flattenedMap.putAll(msgMap.Properties ?: [:])
         if (includeConformedDimensions) {
@@ -96,22 +90,17 @@ class MessageProcessor {
         flattenedMap.remove("ConformedDimensions")
         flattenedMap.remove("Connections")
         flattenedMap.remove("NodeType")
-        flattenedMap.remove("Properties")
         flattenedMap.remove("RelType")
         flattenedMap.remove("ForwardRel")
 
+        if (includeProperties && !flattenedMap.get("Properties"))
+            flattenedMap.put("Properties", [:])
+        if (!includeProperties) {
+            flattenedMap.remove("Properties")
+        }
+
         flattenedMap
     }
-
-    /*
-    MERGE (employee:Card:Employee {Email: "konrad.aust2@menome.com",EmployeeId: 12345}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Name= "Konrad Aust",employee.Priority= 1,employee.SourceSystem= "HRSystem",employee.Status= "active",employee.PreferredName= "The Chazzinator",employee.ResumeSkills= "programming,peeling bananas from the wrong end,handstands,sweet kickflips" ON MATCH SET employee.Name= "Konrad Aust",employee.Priority= 1,employee.SourceSystem= "HRSystem",employee.Status= "active",employee.PreferredName= "The Chazzinator",employee.ResumeSkills= "programming,peeling bananas from the wrong end,handstands,sweet kickflips" with employee
-    MATCH (office:Office {City: "Victoria"}) WITH employee,office
-    MATCH (project:Project {Code: 5}) WITH employee,office,project
-    MATCH (team:Team {Code: 1337}) WITH employee,office,project,team
-    MERGE (employee)-[office_rel:LocatedInOffice]->(office)
-    MERGE (employee)-[project_rel:WorkedOnProject]->(project)
-    MERGE (employee)-[team_rel:HAS_FACET]->(team)
-     */
 
     static List<String> processMerges(Map msgMap) {
         def mergeStatements = []
@@ -127,9 +116,9 @@ class MessageProcessor {
 
         cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
 
-        Map keysToProcess = flattenMessageMap(msgMap, false)
+        Map keysToProcess = flattenMessageMap(msgMap, false, false)
         cardMerge += ", "
-        def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+        def mergeExpression = "${nodeName} = param.Properties," + buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
         cardMerge += mergeExpression
         cardMerge += " ON MATCH SET " + mergeExpression
         if (msgMap.Connections) {
@@ -153,7 +142,7 @@ class MessageProcessor {
             }
 
             merge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
-            Map keysToProcess = flattenMessageMap(map, false)
+            Map keysToProcess = flattenMessageMap(map, false, false)
             merge += ", "
             def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
             merge += mergeExpression
@@ -172,12 +161,6 @@ class MessageProcessor {
         }
         expression
     }
-
-    /*
-    MATCH (office:Office {City: "Victoria"}) WITH employee,office
-    MATCH (project:Project {Code: 5}) WITH employee,office,project
-    MATCH (team:Team {Code: 1337}) WITH employee,office,project,team
-    */
 
     static List<String> processConnectionMatches(Map msgMap) {
         List<String> connectedNodeMatchStatements = []

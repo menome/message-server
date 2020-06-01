@@ -104,7 +104,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         List<String> mergeStatements = processPrimaryNodeMergeForMessageWithoutConnections()
         expect:
         mergeStatements.size() == 1
-        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name"
+        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee = param.Properties,employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee = param.Properties,employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name"
     }
 
 
@@ -164,8 +164,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         Map<String,String> parms = MessageProcessor.processPrimaryNodeParametersAsMap(victoriaEmployee)
         Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(victoriaEmployee)
+        println parms
         expect:
-        parms == [Status:"active", Email:"konrad.aust@menome.com", Priority:1.0, PreferredName:"The Chazzinator", EmployeeId:12345.0, SourceSystem:"HRSystem", ResumeSkills:"programming,peeling bananas from the wrong end,handstands,sweet kickflips", Name:"Konrad Aust"]
+        parms == [Email:"konrad.aust@menome.com", Priority:1.0, Properties:[Status:"active", PreferredName:"The Chazzinator",  ResumeSkills:"programming,peeling bananas from the wrong end,handstands,sweet kickflips"], EmployeeId:12345.0, SourceSystem:"HRSystem", Name:"Konrad Aust"]
         connectionParms == [office0: [Name: "Menome Victoria", NodeType: "Office", RelType: "LocatedInOffice", ForwardRel: true, City: "Victoria"], project1: [Name: "theLink", NodeType: "Project", RelType: "WorkedOnProject", ForwardRel: true, Code: "5"], team2: [Name: "theLink Product Team", NodeType: "Team", Label: "Facet", RelType: "HAS_FACET", ForwardRel: true, Code: "1337"]]
     }
 
