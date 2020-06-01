@@ -6,6 +6,7 @@ import com.menome.messageProcessor.MessageProcessor
 import com.menome.messageProcessor.Neo4JStatements
 import com.menome.util.Neo4J
 import org.apache.commons.lang3.time.StopWatch
+import org.everit.json.schema.ValidationException
 import org.neo4j.driver.Driver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -53,17 +54,22 @@ class MessageBatchProcessor {
         Map<String, List<String>> messagesByNodeType = [:]
         List<MessageError> errors = []
         messages.each() { String jsonMessage ->
-            def msg = MessageProcessor.buildMapFromJSONString(jsonMessage)
-            String nodeType = msg.NodeType
-            if (nodeType) {
-                List<String> messageList = messagesByNodeType.get(nodeType)
-                if (!messageList) {
-                    messageList = []
+            try {
+                MessageProcessor.validateMessage(jsonMessage)
+                def msg = MessageProcessor.buildMapFromJSONString(jsonMessage)
+                String nodeType = msg.NodeType
+                if (nodeType) {
+                    List<String> messageList = messagesByNodeType.get(nodeType)
+                    if (!messageList) {
+                        messageList = []
+                    }
+                    messageList.add(jsonMessage)
+                    messagesByNodeType.put(nodeType, messageList)
+                } else {
+                    errors.add(new MessageError(new InvalidMessageException("Missing NodeType").toString(), jsonMessage))
                 }
-                messageList.add(jsonMessage)
-                messagesByNodeType.put(nodeType, messageList)
-            } else {
-                errors.add(new MessageError(new InvalidMessageException("Missing NodeType").toString(), jsonMessage))
+            } catch (ValidationException ex){
+                errors.add(new MessageError(ex.errorMessage, jsonMessage))
             }
         }
         return new Tuple2(messagesByNodeType, errors)

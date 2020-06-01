@@ -1,6 +1,8 @@
 package com.menome.messageProcessor
 
 import com.menome.MessagingSpecification
+import org.everit.json.schema.ValidationException
+import org.json.JSONException
 
 class MessageProcessorSpecification extends MessagingSpecification {
 
@@ -42,11 +44,12 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
 
     def "process invalid empty message"() {
-        given:
+        when:
         def msg = ""
         MessageProcessor processor = new MessageProcessor()
         Neo4JStatements statements = processor.process(msg)
-        expect:
+        then:
+        JSONException ex = thrown()
         !statements
     }
 
@@ -244,4 +247,20 @@ class MessageProcessorSpecification extends MessagingSpecification {
         1==1
     }
 
+    def "valid message no validation exception"(){
+        when:
+        MessageProcessor.validateMessage(victoriaEmployee)
+        then:
+        noExceptionThrown()
+    }
+
+
+    def "invalid message should throw exception"(){
+        when:
+        MessageProcessor.validateMessage(invalidMessage)
+        then:
+        ValidationException ex = thrown()
+        ex.allMessages.size() == 1
+        ex.allMessages[0] == "#/NodeType: string [Invalid Node With Spaces] does not match pattern ^[a-zA-Z0-9_]*\$"
+    }
 }

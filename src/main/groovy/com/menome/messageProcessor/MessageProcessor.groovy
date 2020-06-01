@@ -1,16 +1,22 @@
 package com.menome.messageProcessor
 
 import com.google.gson.Gson
+import org.everit.json.schema.Schema
+import org.everit.json.schema.loader.SchemaLoader
+import org.json.JSONObject
+import org.json.JSONTokener
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 class MessageProcessor {
-
-
     static Logger log = LoggerFactory.getLogger(MessageProcessor.class)
 
     static Neo4JStatements process(String msg) {
-        Neo4JStatements statements = null;
+
+        validateMessage(msg)
+        // throws a ValidationException if this object is invalid
+
+        Neo4JStatements statements = null
         if (msg) {
             def msgMap = buildMapFromJSONString(msg)
             List<String> primaryNodeMerge = processPrimaryNodeMerge(msgMap)
@@ -20,6 +26,13 @@ class MessageProcessor {
             statements = new Neo4JStatements(primaryNodeMerge, indexes, connectionMerges, connectionMatches)
         }
         statements
+    }
+
+    static void validateMessage(String message){
+        def jsonSchema = new File("src/main/resources/harvester_schema.json").text
+        JSONObject rawSchema = new JSONObject(new JSONTokener(jsonSchema))
+        Schema schema = SchemaLoader.load(rawSchema)
+        schema.validate(new JSONObject(message))
     }
 
     static List<String> processPrimaryNodeMerge(Map msgMap) {
@@ -64,7 +77,7 @@ class MessageProcessor {
     }
 
     static Map<String, String> processPrimaryNodeParametersAsMap(Map msgMap) {
-         flattenMessageMap(msgMap, true, true)
+        flattenMessageMap(msgMap, true, true)
     }
 
 

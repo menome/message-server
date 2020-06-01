@@ -1,0 +1,131 @@
+{
+  "title": "harvesterMessage",
+  "type": "object",
+  "required": [
+    "NodeType",
+    "ConformedDimensions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "Name": {
+      "type": "string"
+    },
+    "NodeType": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_]*$"
+    },
+    "Label": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_]*$"
+    },
+    "SourceSystem": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_\\s.'&]*$"
+    },
+    "ConformedDimensions": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "Properties": {
+      "type": "object"
+    },
+    "DateProperties": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d:[0-5]\\d|Z))|(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d([+-][0-2]\\d:[0-5]\\d|Z))|(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d([+-][0-2]\\d:[0-5]\\d|Z))$"
+      }
+    },
+    "DeleteNode": {
+      "type": "boolean"
+    },
+    "DeleteProperties": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_\\s.'&]*$"
+      }
+    },
+    "Connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "NodeType",
+          "RelType",
+          "ForwardRel",
+          "ConformedDimensions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "NodeType": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_]*$"
+          },
+          "Label": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_]*$"
+          },
+          "ForwardRel": {
+            "type": "boolean"
+          },
+          "RelType": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_]*$"
+          },
+          "ConformedDimensions": {
+            "type": "object",
+            "minProperties": 1
+          },
+          "Properties": {
+            "type": "object"
+          },
+          "DateProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d:[0-5]\\d|Z))|(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d([+-][0-2]\\d:[0-5]\\d|Z))|(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d([+-][0-2]\\d:[0-5]\\d|Z))$"
+            }
+          },
+          "DeleteProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_\\s.'&]*$"
+            }
+          },
+          "RelProps": {
+            "type": "object"
+          },
+          "DateRelProps": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d:[0-5]\\d|Z))|(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d([+-][0-2]\\d:[0-5]\\d|Z))|(\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d([+-][0-2]\\d:[0-5]\\d|Z))$"
+            }
+          },
+          "DeleteRelProps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_\\s.'&]*$"
+            }
+          },
+          "DeleteRelationship": {
+            "type": "boolean"
+          },
+          "DeleteNode": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "Priority": {
+      "type": "number",
+      "minimum": 0
+    }
+  }
+}

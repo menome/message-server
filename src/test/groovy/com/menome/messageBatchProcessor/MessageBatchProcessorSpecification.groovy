@@ -72,8 +72,10 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
         Driver driver = Neo4J.openDriver()
         def messages = new ArrayList(threeMessageBatch)
         messages.add(invalidMessage)
-        MessageBatchProcessor.process(messages, driver)
+        def batchResult = MessageBatchProcessor.process(messages, driver)
         expect:
+        batchResult.errors.size() == 1
+        batchResult.errors[0].errorText == "string [Invalid Node With Spaces] does not match pattern ^[a-zA-Z0-9_]*\$"
         3 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
         cleanup:
         driver.close()
