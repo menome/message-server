@@ -15,7 +15,7 @@ import static org.awaitility.Awaitility.await
 class MessageBatchPerformanceSpecification extends SymendMessagingSpecification {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchPerformanceSpecification.class)
-    static int BATCH_SIZE = 5000
+    static int BATCH_SIZE = 5_000
 
     def setup() {
         def driver = Neo4J.openDriver()
@@ -23,17 +23,9 @@ class MessageBatchPerformanceSpecification extends SymendMessagingSpecification 
         await().atMost(1, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0 }
     }
 
-    def createReferenceData() {
-        processMessageList(buildSymendActivities(5000))
-        processMessageList(buildSymendAccounts(5000))
-        processMessageList(buildSymendDialerEntries(5000))
-    }
-
-    boolean testMessageCreate(int numberOfNodes, int numberOfConnections, int numberOfPrimaryNodeProperties) {
+    def testMessageCreate(int numberOfNodes, int numberOfConnections, int numberOfPrimaryNodeProperties) {
         List<String> symendMessages = buildSymendMessages(numberOfNodes, numberOfConnections, numberOfPrimaryNodeProperties)
         processMessageList(symendMessages)
-        true
-
     }
 
     private static void processMessageList(List<String> symendMessages) {
@@ -51,19 +43,18 @@ class MessageBatchPerformanceSpecification extends SymendMessagingSpecification 
 
     }
 
-
-
     def "spectrum test"() {
         given:
-        def messagesToCreate = [5, 50, 500, 5_000, 50_000]
+        //def messagesToCreate = [5, 50, 500, 5_000, 50_000]
+        def messagesToCreate = [5, 50, 500]
         def connectionsToCreate = [0, 3]
-        def primaryPropertiesToCreate = [0, 5, 10, 41] //4
+        def primaryPropertiesToCreate = [0, 5, 10, 41]
 
         messagesToCreate.each() { messageCount ->
             connectionsToCreate.each() { connectionCount ->
                 primaryPropertiesToCreate.each() { primaryPropertyCount ->
                     log.info("{} nodes {} properties with {} connections", messageCount, primaryPropertyCount,connectionCount)
-                    testMessageCreate(messageCount, connectionCount, primaryPropertyCount)
+                    testMessageCreate(messageCount as int, connectionCount as int, primaryPropertyCount)
                 }
             }
         }

@@ -14,10 +14,10 @@ class RabbitMQ {
 
     static ConnectionFactory createRabbitConnectionFactory() {
         ConnectionFactory rabbitConnectionFactory = new ConnectionFactory()
-        def host = ApplicationConfiguration.rabbitMQHost
-        def port = ApplicationConfiguration.rabbitMQPort
-        def username = ApplicationConfiguration.rabbitMQUsername
-        def password = ApplicationConfiguration.rabbitMQPassword
+        def host = ApplicationConfiguration.getString(PreferenceType.RABBITMQ_HOST)
+        def port = ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT)
+        def username = ApplicationConfiguration.getString(PreferenceType.RABBITMQ_USER)
+        def password = ApplicationConfiguration.getString(PreferenceType.RABBITMQ_PASSWORD)
         rabbitConnectionFactory.host = host
         rabbitConnectionFactory.port = port
         rabbitConnectionFactory.username = username
@@ -43,8 +43,8 @@ class RabbitMQ {
         try {
             def rabbitConnection = connectionFactory.newConnection()
             Channel rabbitChannel = rabbitConnection.createChannel()
-            rabbitChannel.queueBind(ApplicationConfiguration.rabbitMQQueue,ApplicationConfiguration.rabbitMQExchange,"")
-        } catch (Exception e) {
+            rabbitChannel.queueBind(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE),ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE),"")
+        } catch (Exception ignored) {
             ok = Boolean.FALSE
         }
         ok
