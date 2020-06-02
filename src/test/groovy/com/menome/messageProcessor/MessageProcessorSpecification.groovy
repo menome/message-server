@@ -49,8 +49,15 @@ class MessageProcessorSpecification extends MessagingSpecification {
         MessageProcessor processor = new MessageProcessor()
         Neo4JStatements statements = processor.process(msg)
         then:
-        JSONException ex = thrown()
         !statements
+    }
+
+    def "validate empty message expect exception"(){
+        when:
+        def msg = ""
+        MessageProcessor.validateMessage(msg)
+        then:
+        JSONException ex = thrown()
     }
 
 
@@ -66,26 +73,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
         given:
         List<String> statements = processPrimaryNodeMergeForMessageWithConnections()
         expect:
-        statements.each(){
-            log.info(it)
-        }
         statements.size() == 7
     }
 
-    def "process all statements for message with connections"(){
-        given:
-        Neo4JStatements statements = processMessage(victoriaEmployee)
-        expect:
-        statements.indexes.each(){
-            println it
-        }
-        statements.connectionMerge.each(){
-            println it
-        }
-        statements.primaryNodeMerge.each(){
-            println it
-        }
-    }
 
     def "process indexes from simple message"() {
         given:
@@ -158,9 +148,10 @@ class MessageProcessorSpecification extends MessagingSpecification {
         when:
         Neo4JStatements statements = processor.process(victoriaEmployee)
         then:
-        statements.primaryNodeMerge.size() ==  7
-        statements.indexes.size() == 2
-        statements.connectionMerge.size() == 3
+        7 == statements.primaryNodeMerge.size()
+        2 == statements.indexes.size()
+        3 == statements.connectionMerge.size()
+        3 == statements.connectionMatch.size()
     }
 
     def "process parameter"() {

@@ -55,9 +55,7 @@ class MessageProcessor {
     }
 
     static Map buildMapFromJSONString(String msg) {
-        Gson gson = new Gson()
-        Map msgMap = gson.fromJson(msg, Map.class)
-        msgMap
+        new Gson().fromJson(msg, Map.class)
     }
 
     static List<String> processIndexes(Map msgMap) {
@@ -82,11 +80,11 @@ class MessageProcessor {
     static Map<String, Map<String, String>> processParameterForConnections(Map msgMap) {
         Map<String, Map<String, String>> paramMap = [:]
         msgMap.Connections.eachWithIndex() { Map it, Integer i ->
-            Map connectionMap = [:]
+            Map<String,String> connectionMap = [:]
             connectionMap.putAll(it)
-            connectionMap.putAll(it.ConformedDimensions)
+            connectionMap.putAll(it.ConformedDimensions as Map)
             connectionMap.remove("ConformedDimensions")
-            def key = it.NodeType.toLowerCase() + Integer.toString(i)
+            String key = it.NodeType.toLowerCase() + Integer.toString(i)
             paramMap.put(key, connectionMap)
         }
         paramMap
@@ -94,9 +92,8 @@ class MessageProcessor {
 
     private static HashMap flattenMessageMap(Map msgMap, boolean includeConformedDimensions, boolean includeProperties) {
         def flattenedMap = new HashMap(msgMap)
-        flattenedMap.putAll(msgMap.Properties ?: [:])
         if (includeConformedDimensions) {
-            flattenedMap.putAll(msgMap.ConformedDimensions ?: [:])
+            flattenedMap.putAll(msgMap.ConformedDimensions as Map ?: [:])
         }
         flattenedMap.remove("ConformedDimensions")
         flattenedMap.remove("Connections")
@@ -115,7 +112,6 @@ class MessageProcessor {
 
     static List<String> processMerges(Map msgMap) {
         def mergeStatements = []
-        // Card Merge MERGE (employee:Card:Employee {Email: "konrad.aust@menome.com",EmployeeId: 12345})
         String msgNodeType = msgMap.NodeType
         String nodeName = msgNodeType.toLowerCase()
         def cardMerge = "MERGE (${nodeName}:Card:$msgNodeType "
