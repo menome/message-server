@@ -10,11 +10,12 @@ import org.slf4j.LoggerFactory
 
 class MessageProcessor {
     static Logger log = LoggerFactory.getLogger(MessageProcessor.class)
+    static def jsonSchema = new File("src/main/resources/harvester_schema.json").text
+    static JSONObject rawSchema = new JSONObject(new JSONTokener(jsonSchema))
+    static Schema schema = SchemaLoader.load(rawSchema)
+
 
     static Neo4JStatements process(String msg) {
-
-        validateMessage(msg)
-        // throws a ValidationException if this object is invalid
 
         Neo4JStatements statements = null
         if (msg) {
@@ -29,9 +30,6 @@ class MessageProcessor {
     }
 
     static void validateMessage(String message){
-        def jsonSchema = new File("src/main/resources/harvester_schema.json").text
-        JSONObject rawSchema = new JSONObject(new JSONTokener(jsonSchema))
-        Schema schema = SchemaLoader.load(rawSchema)
         schema.validate(new JSONObject(message))
     }
 
