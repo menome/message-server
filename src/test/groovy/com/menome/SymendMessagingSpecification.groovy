@@ -162,7 +162,7 @@ class SymendMessagingSpecification extends MessagingSpecification {
         List<Connection> connections = []
         (1..count).each {
             def accountId = random.nextInt(count)
-            def account = Connection.builder().Name("Account ${accountId}").NodeType("Account").RelType("COLLECTION_ENTRY_FOR_ACCOUNT").ForewardRel(true).ConformedDimensions(["ACCTNUM": accountId]).build()
+            def account = Connection.builder().Name("Account ${accountId}").NodeType("Account").RelType("COLLECTION_ENTRY_FOR_ACCOUNT").ForewardRel(true).ConformedDimensions(["ACCTNUM": accountId]).Properties(["SourceSystem": "menome_test_framework"]).build()
             connections.add(account)
         }
         connections
@@ -173,7 +173,7 @@ class SymendMessagingSpecification extends MessagingSpecification {
         List<Connection> connections = []
         (1..count).each {
             def activityCodeId = random.nextInt(count)
-            def activity = Connection.builder().Name("Activity ${activityCodeId}").NodeType("CollectionActivity").RelType("ACTIVITY").ForewardRel(true).ConformedDimensions(["COL_ACTIVITY_CODE": activityCodeId]).build()
+            def activity = Connection.builder().Name("Activity ${activityCodeId}").NodeType("CollectionActivity").RelType("ACTIVITY").ForewardRel(true).ConformedDimensions(["COL_ACTIVITY_CODE": activityCodeId]).Properties(["SourceSystem": "menome_test_framework"]).build()
             connections.add(activity)
         }
         connections
@@ -184,7 +184,7 @@ class SymendMessagingSpecification extends MessagingSpecification {
         List<Connection> connections = []
         (1..count).each {
             def key = random.nextInt(count)
-            def activity = Connection.builder().Name("Dialer Entry ${key}").NodeType("DialerEntry").RelType("COLLECTION").ForewardRel(true).ConformedDimensions(["SNAPSHOT_SDT": key, "ACCTNUM": key]).build()
+            def activity = Connection.builder().Name("Dialer Entry ${key}").NodeType("DialerEntry").RelType("COLLECTION").ForewardRel(true).ConformedDimensions(["SNAPSHOT_SDT": key, "ACCTNUM": key]).Properties(["SourceSystem": "menome_test_framework"]).build()
             connections.add(activity)
         }
         connections

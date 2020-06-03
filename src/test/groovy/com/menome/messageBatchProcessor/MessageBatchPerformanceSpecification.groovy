@@ -45,8 +45,8 @@ class MessageBatchPerformanceSpecification extends SymendMessagingSpecification 
 
     def "spectrum test"() {
         given:
-        def messagesToCreate = [5, 50, 500, 5_000, 50_000]
-        //def messagesToCreate = [5, 50, 500]
+        //def messagesToCreate = [5, 50, 500, 5_000, 50_000]
+        def messagesToCreate = [5, 50, 500]
         def connectionsToCreate = [0, 3]
         def primaryPropertiesToCreate = [0, 5, 10, 41]
 
