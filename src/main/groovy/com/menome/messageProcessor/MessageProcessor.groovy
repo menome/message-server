@@ -29,7 +29,7 @@ class MessageProcessor {
         statements
     }
 
-    static void validateMessage(String message){
+    static void validateMessage(String message) {
         schema.validate(new JSONObject(message))
     }
 
@@ -80,10 +80,12 @@ class MessageProcessor {
     static Map<String, Map<String, String>> processParameterForConnections(Map msgMap) {
         Map<String, Map<String, String>> paramMap = [:]
         msgMap.Connections.eachWithIndex() { Map it, Integer i ->
-            Map<String,String> connectionMap = [:]
+            Map<String, String> connectionMap = [:]
             connectionMap.putAll(it)
             connectionMap.putAll(it.ConformedDimensions as Map)
+            connectionMap.putAll(it.Properties as Map ?: [:])
             connectionMap.remove("ConformedDimensions")
+            connectionMap.remove("Properties")
             String key = it.NodeType.toLowerCase() + Integer.toString(i)
             paramMap.put(key, connectionMap)
         }
@@ -92,7 +94,7 @@ class MessageProcessor {
 
     private static HashMap flattenMessageMap(Map msgMap, boolean includeConformedDimensions) {
         def flattenedMap = new HashMap(msgMap)
-        flattenedMap.putAll(msgMap.Properties ?: [:])
+        flattenedMap.putAll(msgMap.Properties as Map ?: [:])
         if (includeConformedDimensions) {
             flattenedMap.putAll(msgMap.ConformedDimensions as Map ?: [:])
         }

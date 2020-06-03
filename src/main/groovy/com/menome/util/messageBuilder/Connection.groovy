@@ -17,4 +17,6 @@ class Connection {
     boolean ForewardRel
     @SerializedName("ConformedDimensions")
     Map ConformedDimensions
+    @SerializedName("Properties")
+    Map Properties
 }

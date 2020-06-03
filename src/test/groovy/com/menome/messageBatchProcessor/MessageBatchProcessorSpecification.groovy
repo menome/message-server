@@ -15,7 +15,7 @@ class MessageBatchProcessorSpecification extends MessagingSpecification {
 
     def setup() {
         def driver = Neo4J.openDriver()
-        Neo4J.run(driver, "match (n) detach delete n")
+        Neo4J.run(driver, "match (n) where n.SourceSystem='menome_test_framework' detach delete n")
         await().atMost(1, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0 }
 
         driver.close()

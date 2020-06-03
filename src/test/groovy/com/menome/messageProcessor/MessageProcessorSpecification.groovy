@@ -110,9 +110,9 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
         expect:
         mergeStatements.size() == 3
-        officeNode == "MERGE (office0:Office{City: param.City}) ON CREATE SET office0.Uuid = apoc.create.uuid(),office0.TheLinkAddedDate = datetime(), office0.Name= param.Name ON MATCH SET office0.Name= param.Name"
-        projectNode == "MERGE (project1:Project{Code: param.Code}) ON CREATE SET project1.Uuid = apoc.create.uuid(),project1.TheLinkAddedDate = datetime(), project1.Name= param.Name ON MATCH SET project1.Name= param.Name"
-        teamNode == "MERGE (team2:Team{Code: param.Code}) ON CREATE SET team2.Uuid = apoc.create.uuid(),team2.TheLinkAddedDate = datetime(), team2.Label= param.Label,team2.Name= param.Name ON MATCH SET team2.Label= param.Label,team2.Name= param.Name"
+        officeNode == "MERGE (office0:Office{City: param.City}) ON CREATE SET office0.Uuid = apoc.create.uuid(),office0.TheLinkAddedDate = datetime(), office0.SourceSystem= param.SourceSystem,office0.Name= param.Name ON MATCH SET office0.SourceSystem= param.SourceSystem,office0.Name= param.Name"
+        projectNode == "MERGE (project1:Project{Code: param.Code}) ON CREATE SET project1.Uuid = apoc.create.uuid(),project1.TheLinkAddedDate = datetime(), project1.SourceSystem= param.SourceSystem,project1.Name= param.Name ON MATCH SET project1.SourceSystem= param.SourceSystem,project1.Name= param.Name"
+        teamNode == "MERGE (team2:Team{Code: param.Code}) ON CREATE SET team2.Uuid = apoc.create.uuid(),team2.TheLinkAddedDate = datetime(), team2.Label= param.Label,team2.SourceSystem= param.SourceSystem,team2.Name= param.Name ON MATCH SET team2.Label= param.Label,team2.SourceSystem= param.SourceSystem,team2.Name= param.Name"
 
     }
 
@@ -159,8 +159,8 @@ class MessageProcessorSpecification extends MessagingSpecification {
         Map<String,String> parms = MessageProcessor.processPrimaryNodeParametersAsMap(victoriaEmployee)
         Map<String, String> connectionParms = MessageProcessor.processParameterForConnections(victoriaEmployee)
         expect:
-        parms == [Status:"active", Email:"konrad.aust@menome.com", Priority:1.0, PreferredName:"The Chazzinator", EmployeeId:12345.0, SourceSystem:"HRSystem", ResumeSkills:"programming,peeling bananas from the wrong end,handstands,sweet kickflips", Name:"Konrad Aust"]
-        connectionParms == [office0: [Name: "Menome Victoria", NodeType: "Office", RelType: "LocatedInOffice", ForwardRel: true, City: "Victoria"], project1: [Name: "theLink", NodeType: "Project", RelType: "WorkedOnProject", ForwardRel: true, Code: "5"], team2: [Name: "theLink Product Team", NodeType: "Team", Label: "Facet", RelType: "HAS_FACET", ForwardRel: true, Code: "1337"]]
+        parms == [Status:"active", Email:"konrad.aust@menome.com", Priority:1.0, PreferredName:"The Chazzinator", EmployeeId:12345.0, SourceSystem:"menome_test_framework", ResumeSkills:"programming,peeling bananas from the wrong end,handstands,sweet kickflips", Name:"Konrad Aust"]
+        connectionParms == [office0: [Name: "Menome Victoria", NodeType: "Office", RelType: "LocatedInOffice", ForwardRel: true, City: "Victoria", SourceSystem:"menome_test_framework"], project1: [Name: "theLink", NodeType: "Project", RelType: "WorkedOnProject", ForwardRel: true, Code: "5", SourceSystem:"menome_test_framework"], team2: [Name: "theLink Product Team", NodeType: "Team", Label: "Facet", RelType: "HAS_FACET", ForwardRel: true, Code: "1337", SourceSystem:"menome_test_framework"]]
     }
 
     def "check deriveMessageTypeFromStatement"() {
@@ -178,12 +178,13 @@ class MessageProcessorSpecification extends MessagingSpecification {
         String nodeType = MessageProcessor.deriveMessageTypeFromStatement(officeMerge) + "0"
         expect:
         Map officeParms = connectionParms[nodeType]
-        officeParms.size() == 5
+        officeParms.size() == 6
         officeParms.Name == "Menome Victoria"
         officeParms.NodeType == "Office"
         officeParms.RelType == "LocatedInOffice"
         officeParms.ForwardRel == Boolean.TRUE
         officeParms.City == "Victoria"
+        officeParms.SourceSystem == "menome_test_framework"
     }
 
     def "check parameters for office conformed dimension - match"() {
@@ -193,12 +194,13 @@ class MessageProcessorSpecification extends MessagingSpecification {
         String nodeType = MessageProcessor.deriveMessageTypeFromStatement(officeMatch) + "0"
         expect:
         Map officeParms = connectionParms[nodeType]
-        officeParms.size() == 5
+        officeParms.size() == 6
         officeParms.Name == "Menome Victoria"
         officeParms.NodeType == "Office"
         officeParms.RelType == "LocatedInOffice"
         officeParms.ForwardRel == Boolean.TRUE
         officeParms.City == "Victoria"
+        officeParms.SourceSystem == "menome_test_framework"
     }
 
     def "check all parameters"() {
