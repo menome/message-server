@@ -151,6 +151,11 @@ class MessageBatchProcessor {
             List<String> parameters = new ArrayList(uniqueParameters.get(key))
             String unwind = "UNWIND \$parms AS param " + it
             Map neo4JParameters = ["parms": parameters]
+            if (log.isDebugEnabled()) {
+                log.debug(unwind)
+                log.debug(new Gson().toJson(neo4JParameters))
+            }
+
             try {
                 Neo4J.run(driver, unwind, neo4JParameters)
             } catch (Exception e) {

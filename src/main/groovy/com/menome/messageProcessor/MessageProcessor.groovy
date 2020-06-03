@@ -73,7 +73,7 @@ class MessageProcessor {
     }
 
     static Map<String, String> processPrimaryNodeParametersAsMap(Map msgMap) {
-        flattenMessageMap(msgMap, true, true)
+        flattenMessageMap(msgMap, true)
     }
 
 
@@ -90,22 +90,19 @@ class MessageProcessor {
         paramMap
     }
 
-    private static HashMap flattenMessageMap(Map msgMap, boolean includeConformedDimensions, boolean includeProperties) {
+    private static HashMap flattenMessageMap(Map msgMap, boolean includeConformedDimensions) {
         def flattenedMap = new HashMap(msgMap)
+        flattenedMap.putAll(msgMap.Properties ?: [:])
         if (includeConformedDimensions) {
             flattenedMap.putAll(msgMap.ConformedDimensions as Map ?: [:])
         }
         flattenedMap.remove("ConformedDimensions")
         flattenedMap.remove("Connections")
         flattenedMap.remove("NodeType")
+        flattenedMap.remove("Properties")
         flattenedMap.remove("RelType")
         flattenedMap.remove("ForwardRel")
 
-        if (includeProperties && !flattenedMap.get("Properties"))
-            flattenedMap.put("Properties", [:])
-        if (!includeProperties) {
-            flattenedMap.remove("Properties")
-        }
 
         flattenedMap
     }
@@ -123,9 +120,9 @@ class MessageProcessor {
 
         cardMerge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
 
-        Map keysToProcess = flattenMessageMap(msgMap, false, false)
+        Map keysToProcess = flattenMessageMap(msgMap, false)
         cardMerge += ", "
-        def mergeExpression = "${nodeName} = param.Properties," + buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+        def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
         cardMerge += mergeExpression
         cardMerge += " ON MATCH SET " + mergeExpression
         if (msgMap.Connections) {
@@ -149,7 +146,7 @@ class MessageProcessor {
             }
 
             merge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
-            Map keysToProcess = flattenMessageMap(map, false, false)
+            Map keysToProcess = flattenMessageMap(map, false)
             merge += ", "
             def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
             merge += mergeExpression
