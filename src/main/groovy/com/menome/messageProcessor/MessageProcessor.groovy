@@ -10,9 +10,30 @@ import org.slf4j.LoggerFactory
 
 class MessageProcessor {
     static Logger log = LoggerFactory.getLogger(MessageProcessor.class)
-    static def jsonSchema = new File("src/main/resources/harvester_schema.json").text
-    static JSONObject rawSchema = new JSONObject(new JSONTokener(jsonSchema))
-    static Schema schema = SchemaLoader.load(rawSchema)
+    static def jsonSchema
+    static JSONObject rawSchema
+    static Schema schema
+
+
+    static {
+        jsonSchema = null
+        try {
+            jsonSchema = new File("src/main/resources/harvester_schema.json").text
+        } catch (Exception ignore) {
+            try {
+                jsonSchema = getClass().getResourceAsStream("/harvester_schema.json").text
+            } catch (Exception e) {
+                log.info("MessageProcessor validation disabled. Schema harvester_schema.json cannot be located. ")
+            }
+        }
+
+        if (jsonSchema != null) {
+            log.info("MessageProcessor schema validation enabled. harvester_schema.json will be used to validate all incoming messages. ")
+            rawSchema = new JSONObject(new JSONTokener(jsonSchema))
+            schema = SchemaLoader.load(rawSchema)
+        }
+
+    }
 
 
     static Neo4JStatements process(String msg) {
@@ -30,7 +51,9 @@ class MessageProcessor {
     }
 
     static void validateMessage(String message) {
-        schema.validate(new JSONObject(message))
+        if (schema != null) {
+            schema.validate(new JSONObject(message))
+        }
     }
 
     static List<String> processPrimaryNodeMerge(Map msgMap) {

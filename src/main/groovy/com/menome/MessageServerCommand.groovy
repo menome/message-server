@@ -6,6 +6,7 @@ import com.menome.messageBatchProcessor.MessageBatchResult
 import com.menome.messageBatchProcessor.MessageBatchSummary
 import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
+import com.menome.util.PreferenceType
 import com.menome.util.RabbitMQ
 import com.rabbitmq.client.Address
 import com.rabbitmq.client.ConnectionFactory
@@ -59,14 +60,14 @@ class MessageServerCommand implements Runnable {
 
         ReceiverOptions receiverOptions = new ReceiverOptions()
                 .connectionFactory(rabbitConnectionFactory)
-                .connectionSupplier({ cf -> cf.newConnection([new Address(ApplicationConfiguration.rabbitMQHost)], ApplicationConfiguration.rabbitMQQueue) })
+                .connectionSupplier({ cf -> cf.newConnection([new Address(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_HOST))], ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE)) })
 
 
 
-        log.info("Message Server waiting for messages on queue {} processing messages with a batch size of {}", ApplicationConfiguration.rabbitMQQueue, ApplicationConfiguration.rabbitMQBatchSize)
-        RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.rabbitMQQueue)
+        log.info("Message Server waiting for messages on queue {} processing messages with a batch size of {}", ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE))
+        RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE))
                 .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
-                .bufferTimeout(ApplicationConfiguration.rabbitMQBatchSize, Duration.ofSeconds(2))
+                .bufferTimeout(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE), Duration.ofSeconds(2))
                 .map({ messages -> MessageBatchProcessor.process(messages, driver) })
                 .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
                 .subscribe()
