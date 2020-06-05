@@ -1,11 +1,12 @@
 package com.menome
 
+import com.menome.util.MessagingWithTestContainersSpecification
 import com.menome.util.messageBuilder.Connection
 import com.menome.util.messageBuilder.MessageBuilder
 
 import java.time.Instant
 
-class SymendMessagingSpecification extends MessagingSpecification {
+class SymendMessagingSpecification extends MessagingWithTestContainersSpecification {
     List<Connection> accounts
     List<Connection> activities
     List<Connection> dialers

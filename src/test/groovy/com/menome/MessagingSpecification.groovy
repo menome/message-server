@@ -8,19 +8,12 @@ import com.rabbitmq.client.Channel
 import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.testcontainers.containers.GenericContainer
-import org.testcontainers.containers.Network
 import spock.lang.Specification
 
-import java.time.Duration
 import java.time.LocalDateTime
 import java.time.Month
 
-class MessagingSpecification extends Specification {
-
-    protected static final int NEO4J_BOLT_API_PORT = 7687
-    protected static final int NEO4J_WEB_PORT = 7474
-
+abstract class MessagingSpecification extends Specification {
 
     static Logger log = LoggerFactory.getLogger(MessagingSpecification.class)
 
@@ -109,66 +102,12 @@ class MessagingSpecification extends Specification {
             meetingMessageWithConnections]
 
 
-    protected static List<String> fiveThousandMessageBatch = (1..5000).collect() {
-        MessageBuilder.builder()
-                .Name("Konrad Aust")
-                .NodeType("Employee")
-                .Priority(1)
-                .SourceSystem("menome_test_framework")
-                .ConformedDimensions("Email": "konrad.aust" + UUID.randomUUID() + "@menome.com", "EmployeeId": UUID.randomUUID())
-                .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
-                .Connections([victoriaOffice, project, team])
-                .build()
-                .toJSON()
-    }
-
-
-
-
-    protected static GenericContainer createAndStartNeo4JContainer(Network network) {
-        GenericContainer neo4JContainer = new GenericContainer("neo4j:4.0.3")
-                .withNetwork(network)
-                .withNetworkAliases("neo4j")
-                .withExposedPorts(NEO4J_WEB_PORT)
-                .withExposedPorts(NEO4J_BOLT_API_PORT)
-                .withEnv("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes")
-                .withEnv("NEO4J_AUTH", "neo4j/password")
-                .withEnv("NEO4JLABS_PLUGINS", "[\"apoc\"]")
-                .withStartupTimeout(Duration.ofMinutes(5))
-
-        neo4JContainer.start()
-
-        println "Neo4J - Bolt bolt://localhost:${neo4JContainer.getMappedPort(NEO4J_BOLT_API_PORT)}"
-        println "Neo4J - Web http://localhost:${neo4JContainer.getMappedPort(NEO4J_WEB_PORT)}"
-
-        return neo4JContainer
-    }
-
     protected static ConnectionFactory createRabbitConnectionFactory() {
         RabbitMQ.createRabbitConnectionFactory()
     }
 
     protected static Channel openRabbitMQChanel(String queue, String exchange, String routingKey, ConnectionFactory rabbitConnectionFactory) {
-        return RabbitMQ.openRabbitMQChannel(queue,exchange,routingKey,rabbitConnectionFactory)
+        return RabbitMQ.openRabbitMQChannel(queue, exchange, routingKey, rabbitConnectionFactory)
     }
-
-
-/*
-    protected static GenericContainer createAndStartRabbitMQContainer(Network network) {
-        GenericContainer rabbitMQContainer = new GenericContainer("rabbitmq:management-alpine")
-                .withNetwork(network)
-                .withNetworkAliases("rabbitmq")
-                .withExposedPorts(RABBITMQ_PORT)
-                .withExposedPorts(RABBITMQ_MANAGEMENT_PORT)
-                .withEnv("RABBITMQ_DEFAULT_USER", "menome")
-                .withEnv("RABBITMQ_DEFAULT_PASS", "menome")
-
-        rabbitMQContainer.start()
-
-        RabbitMQVolumeSpecification.log.info "Rabbit MQ - http://localhost:${rabbitMQContainer.getMappedPort(RABBITMQ_MANAGEMENT_PORT)}"
-
-        return rabbitMQContainer
-    }
-*/
 
 }

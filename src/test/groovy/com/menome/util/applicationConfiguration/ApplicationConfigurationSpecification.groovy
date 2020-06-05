@@ -9,6 +9,8 @@ import java.lang.reflect.Field
 class ApplicationConfigurationSpecification extends Specification {
 
     def "test defaults"() {
+        given:
+        System.setProperties(new Properties())
         expect:
         "neo4j" == ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)
         "localhost" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_HOST)

@@ -1,6 +1,7 @@
 package com.menome.messageBatchProcessor
 
-import com.menome.MessagingSpecification
+
+import com.menome.util.MessagingWithTestContainersSpecification
 import com.menome.util.Neo4J
 import org.neo4j.driver.Driver
 import org.neo4j.driver.Record
@@ -11,7 +12,7 @@ import java.util.concurrent.TimeUnit
 import static org.awaitility.Awaitility.await
 import static org.awaitility.Awaitility.given
 
-class MessageBatchProcessorSpecification extends MessagingSpecification {
+class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpecification {
 
     def setup() {
         def driver = Neo4J.openDriver()
