@@ -1,6 +1,6 @@
 package com.menome
 
-import com.menome.util.MessagingWithTestContainersSpecification
+
 import com.menome.util.messageBuilder.Connection
 import com.menome.util.messageBuilder.MessageBuilder
 

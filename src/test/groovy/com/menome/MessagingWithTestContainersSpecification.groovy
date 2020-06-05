@@ -1,6 +1,7 @@
-package com.menome.util
+package com.menome
 
-import com.menome.MessagingSpecification
+import com.menome.util.ApplicationConfiguration
+import com.menome.util.PreferenceType
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.Network
 
@@ -22,7 +23,7 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
         Network network = Network.newNetwork()
 
-        log.info("Starting RabbitMQ Container")
+        MessagingSpecification.log.info("Starting RabbitMQ Container")
 
         rabbitMQContainer = new GenericContainer("rabbitmq:management-alpine")
                 .withNetwork(network)
@@ -36,10 +37,10 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
         System.setProperty(PreferenceType.RABBITMQ_PORT.name(), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_MANAGEMENT_PORT))
 
-        log.info "RabbitMQ Docker container running at  - http://localhost:${rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_MANAGEMENT_PORT))}"
+        MessagingSpecification.log.info "RabbitMQ Docker container running at  - http://localhost:${rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_MANAGEMENT_PORT))}"
 
 
-        log.info("Starting Neo4J Container")
+        MessagingSpecification.log.info("Starting Neo4J Container")
         neo4JContainer = new GenericContainer("neo4j:4.0.3")
                 .withNetwork(network)
                 .withNetworkAliases("neo4j")
@@ -52,8 +53,8 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
         neo4JContainer.start()
 
-        log.info "Neo4J Docker Container - Bolt bolt://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT))}"
-        log.info "Neo4J Docker Container - Web http://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_WEB_PORT))}"
+        MessagingSpecification.log.info "Neo4J Docker Container - Bolt bolt://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT))}"
+        MessagingSpecification.log.info "Neo4J Docker Container - Web http://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_WEB_PORT))}"
 
         System.setProperty(PreferenceType.NEO4J_BOLT_PORT.name(), neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)).toString())
         System.setProperty(PreferenceType.RABBITMQ_PORT.name(), rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT)).toString())
