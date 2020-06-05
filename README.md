@@ -185,9 +185,14 @@ Neo4J - contains methods for establishing connections to and running cypher stat
 
 RabbitMQ - contains methods for establishing connections to the Rabbit MQ message bus.
 
+## Gradle
+//TODO
+
+//todo: property to start test containers
+
 ## How to Build/Run 
 
-Ensure you have a JDK installed. I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
+Ensure you have a JDK installed (version 11+). I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
 
 Execute the following from the command line
 
@@ -197,13 +202,6 @@ Execute the following from the command line
 ----
 
 To run the tests execute:
-
-*** WARNING ***
-
-These tests will remove all nodes and relationships from the target NEO4J database DO NOT run these against a production configuration.
-
-*** WARNING ***
-
 
 ```shell script
 ./gradlew test
