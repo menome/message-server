@@ -50,6 +50,8 @@ This project reads messages in a specific structure from a RabbitMQ queue and co
   }
 ```
 
+Resulting Cypher statements
+
 ```
 CREATE INDEX ON :Employee(Email,EmployeeId)
 CREATE INDEX ON :Card(Email,EmployeeId)
@@ -67,6 +69,7 @@ MERGE (employee)-[project1_rel:WorkedOnProject]->(project1)
 MERGE (employee)-[team2_rel:HAS_FACET]->(team2)
 ```
 
+Resulting Graph
 
 ![Three Node Employee Graph](doc/assets/ThreeNodeEmployeeGraph.png)
 
@@ -156,10 +159,9 @@ RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfigurati
 
 Messages flow in, their contents are pulled out into Strings.
 The buffer fills until the batch size is met or two seconds have elapsed.
-The batch is sent to the MessageMatchProcessor
-The results are logged 
+The batch is sent to the MessageMatchProcessor.
+The results are logged. 
 
-TODO: Command line example with system properties and/or properties files.
  
 ### Message Batch Processor 
 The message batch processor takes a batch of messages (currently an Arraylist<String>). Messages are grouped into maps of the same type. This is to ensure we can apply the same parameter type across all messages. In many cases the batch will have exactly the same message types, but we can't be guaranteed of that.
@@ -173,7 +175,7 @@ The messages in each sub batch are processed.
 One of the interesting aspects to this approach is what happens if there is an error or multiple errors in the batch? The batch is processed in a single transaction and as such, the entire batch will be rolled back. This is not ideal, we want to identify the messages that failed but let the valid ones proceed. When an error in a batch is detected, the batch is split in two and then each subset of the batch is processed again. This splitting happens until the batch size is one which will contain the invalid message. This approach was inspired by Git bisect.
  
 ### Message Processor
-The message processor converts the JSon formatted messages into Neo4J cypher statements. There are three different types of statements that get created from a single message. 
+The message processor converts the JSON formatted messages into Neo4J cypher statements. There are three different types of statements that get created from a single message. 
 - Create indexes for the primary node
 - Merges for the connection node
 - Merge and relationships to the connection nodes from the primary node.
@@ -186,9 +188,8 @@ Neo4J - contains methods for establishing connections to and running cypher stat
 RabbitMQ - contains methods for establishing connections to the Rabbit MQ message bus.
 
 ## Gradle
-//TODO
+The project is built using Gradle (https://gradle.org). All of the external dependencies are declared and managed through the build.gradle file at the root of the project.
 
-//todo: property to start test containers
 
 ## How to Build/Run 
 
@@ -229,6 +230,15 @@ WARNING: All illegal access operations will be denied in a future release
 
 This is due to the requirement to use Groovy 2.x with Micronaut. This warning is coming from the Java 11 JRE and relates to the Groovy compiler reaching across new module boundaries that were introduced in Java 9. It has been resolved in Groovy 3. Unfortunately Micronaut doesn't support Groovy 3 (yet). Once that's resolved the dependencies will be updated and this annoying message will go away.
 
+## Building a Docker Image
+In the root directory of the project there is a Dockerfile. It can be used to build a docker image to run the server.
+
+```shell script
+./gradlew clean assemble shadowJar
+docker build -t menome/message-server:v1 .
+docker run -p 8080:8080 -e RABBITMQ_HOST=<RABBITMQ_HOST_IP_ADDRESS> -e NEO4J_HOST=<NEO4J_HOST_IP_ADDRESS> menome/message-server-1.0:latest
+```
+   
 
 ## Environment/Configuration Variables
 These are the environment variables that are used by the message server to configure the connections to Rabbit MQ and Neo4J. See the ApplicationConfiguration class for the implementation.
@@ -249,44 +259,3 @@ These are the environment variables that are used by the message server to confi
 |NEO4J_PASSWORD      |password          |
 
 
-## Resources
-
-####Twelve Factor Application
-
-The principals described in https://12factor.net/ are generally what we're trying to adhere to with the Menome implementation. 
-
-#####Codebase - One codebase tracked in revision control, many deploys
-No.Each service/bot/agent has it's own project on GitHub. This project is no exception to that 
-
-#####Dependencies - Explicitly declare and isolate dependencies
-Yes. All dependencies are managed through gradle.
- 
-#####Config - Store config in the environment
-Yes. Managed through docker and passed into the system through environment variables.
-
-#####Backing services - Treat backing services as attached resources
-Yes. Neo4J and Rabbit are implmented as such
-
-#####Build, release, run Strictly separate build and run stages
-Yes. Accomplished through Gradle
-
-#####Processes - Execute the app as one or more stateless processes
-Yes. As mentioned above, the approach is to favor immutability at the object level and all state is managed by Neo4J and Rabbit MQ
-
-#####Port binding - Export services via port binding
-Yes. Ports are configured via docker and the server is connects to the outside environment via configuration.
-
-#####Concurrency - Scale out via the process model
-Yes. The code is designed to not only run internally with a high level of concurrency, but the multiple instances of the server can be run to scale out horizontally to service higher workloads. The only constraint is that a Rabbit MQ queue can only be serviced by one server.  
-
-#####Disposability - Maximize robustness with fast startup and graceful shutdown
-Yes. The Micrononaut (https://micronaut.io) framework coupled with the picocli implementation was used to provide fast startup, but also provides other services like health and metrics. 
-  
-#####Dev/prod parity Keep development, staging, and production as similar as possible
-Yes. The server can be run locally with docker containers or configured against standalone Neo4j and Rabbit MQ services. This is exactly how the system will be run in production. This concept is carried forward with the use of testcontainers (https://testcontaners.org)  
-
-#####Logs - Treat logs as event streams
-Yes.
-
-XII. Admin processes
-N/A
