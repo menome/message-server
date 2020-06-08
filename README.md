@@ -1,7 +1,7 @@
-#Overview
+# Overview
 This project reads messages in a specific structure from a RabbitMQ queue and converts them into Neo4J database graph updates 
 
-#Example
+# Example
 ```json5
   {
     "Name": "Konrad Aust",
