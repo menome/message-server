@@ -17,5 +17,4 @@ class Neo4JStatements {
         this.connectionMatch = connectionMatch
     }
 
-    //todo:Might need a custom equals and hashcode to do deep collection comparisons.
 }

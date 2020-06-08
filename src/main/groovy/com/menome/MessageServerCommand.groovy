@@ -1,6 +1,5 @@
 package com.menome
 
-import com.menome.datarefinery.DataRefineryServer
 import com.menome.messageBatchProcessor.MessageBatchProcessor
 import com.menome.messageBatchProcessor.MessageBatchResult
 import com.menome.messageBatchProcessor.MessageBatchSummary
@@ -37,7 +36,7 @@ import java.time.Duration
         ])
 class MessageServerCommand implements Runnable {
 
-    static Logger log = LoggerFactory.getLogger(DataRefineryServer.class)
+    static Logger log = LoggerFactory.getLogger(MessageServerCommand.class)
 
     static void main(String[] args) throws Exception {
         PicocliRunner.run(MessageServerCommand.class, args)
@@ -63,8 +62,8 @@ class MessageServerCommand implements Runnable {
                 .connectionSupplier({ cf -> cf.newConnection([new Address(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_HOST))], ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE)) })
 
 
-
         log.info("Message Server waiting for messages on queue {} processing messages with a batch size of {}", ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE))
+        // This code connects to the Rabbit Server and waits for messages. Messages will be batched up and passed to the Message Processor. The results of the batch are then logged
         RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE))
                 .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
                 .bufferTimeout(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE), Duration.ofSeconds(2))
@@ -103,7 +102,7 @@ class MessageServerCommand implements Runnable {
             def version = record.get("versions").values()[0].asString()
             def edition = record.get("edition").asString()
             log.info("Connected to Neo4J Database Server OK - version:{} edition:{}", version, edition)
-        } catch (Exception e) {
+        } catch (Exception ignored) {
             log.error("Unable to connect to Neo4J Database Server")
             System.exit(-1)
         }

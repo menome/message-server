@@ -4,7 +4,7 @@ plugins {
     id "application"
 }
 
-version "0.1"
+version "1.0"
 group "com.menome"
 
 
@@ -77,8 +77,8 @@ test.classpath += configurations.developmentOnly
 mainClassName = "com.menome.MessageServerCommand"
 
 java {
-    sourceCompatibility = JavaVersion.toVersion('1.8')
-    targetCompatibility = JavaVersion.toVersion('1.8')
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
 }
 
 tasks.withType(GroovyCompile) {

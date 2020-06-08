@@ -26,9 +26,9 @@ class MessageBatchProcessor {
 
         List<MessageError> errors = []
 
-        def t = groupMessagesByNodeType(messages)
-        Map<String, List<String>> messagesByNodeType = t.first
-        errors.addAll(t.second)
+        def messagesByTypeOrErrorsTuple = groupMessagesByNodeType(messages)
+        Map<String, List<String>> messagesByNodeType = messagesByTypeOrErrorsTuple.first
+        errors.addAll(messagesByTypeOrErrorsTuple.second)
 
         messagesByNodeType.each { nodeType, msgs ->
             Neo4JStatements statements = MessageProcessor.process(msgs.get(0))
@@ -43,8 +43,6 @@ class MessageBatchProcessor {
                 log.debug(error.errorText)
             }
         }
-
-
         def batchSummary = new MessageBatchSummary(messages.size(), errors.size(), Duration.ofMillis(timer.getTime(TimeUnit.MILLISECONDS)))
         new MessageBatchResult(batchSummary, errors)
     }
