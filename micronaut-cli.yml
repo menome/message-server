@@ -1,0 +1,6 @@
+applicationType: cli
+defaultPackage: com.menome
+testFramework: spock
+sourceLanguage: groovy
+buildTool: gradle
+features: [app-name, docker, gradle, groovy, logback, picocli, picocli-groovy-application, picocli-spock, readme, shade, spock, yaml]
