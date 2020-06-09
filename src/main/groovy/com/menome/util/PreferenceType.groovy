@@ -15,7 +15,7 @@ enum PreferenceType {
     NEO4J_WEB_PORT("7474"),
     NEO4J_USER("neo4j"),
     NEO4J_PASSWORD("password"),
-    RUN_WITH_TEST_CONTAINERS("N")
+    RUN_WITH_TEST_CONTAINERS("Y")
 
     String defaultValue;
 

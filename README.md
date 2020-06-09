@@ -258,4 +258,33 @@ These are the environment variables that are used by the message server to confi
 |NEO4J_USER          |neo4j             |
 |NEO4J_PASSWORD      |password          |
 
+### Jenkins Configuration
+There is a Jenkins pipeline defined for the project (See Jenkinsfile in the root of the project)
+There is some setup required on the Jenkins server for each JDK
+
+(Replace the specific versions below with the version you want to install. This is provided as an example and is already installed on the Jenkins server)
+
+```
+ssh root@jenkins.menome.com
+su jeknins
+cd jdks
+wget wget https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.7%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
+tar -xvf OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
+rm OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
+```
+
+In Jenkins 
+
+- Global Tool Configuration
+- Add JDK
+- Uncheck install automatically
+- Set JAVA_HOME to /var/lib/jenkins/jdks/jdk-11.0.7+10
+
+Update Jenkinsfile with the label defined in the global tool setup
+
+```
+tools {
+    jdk "jdk-11.0.7"
+}
+``` 
 

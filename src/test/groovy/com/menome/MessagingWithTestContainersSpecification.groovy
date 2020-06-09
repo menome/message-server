@@ -2,6 +2,8 @@ package com.menome
 
 import com.menome.util.ApplicationConfiguration
 import com.menome.util.PreferenceType
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.Network
 
@@ -9,12 +11,16 @@ import java.time.Duration
 
 abstract class MessagingWithTestContainersSpecification extends MessagingSpecification {
 
+    static Logger log = LoggerFactory.getLogger(MessagingWithTestContainersSpecification.class)
+
     static GenericContainer rabbitMQContainer
     static GenericContainer neo4JContainer
 
     def setupSpec() {
         // Start the containers if they need to be and haven't been started yet.
-        if (ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y" && (!rabbitMQContainer || !neo4JContainer)) {
+        if (ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "N") {
+            // Nothing to do here. We're assuming the containers are running outside the test or we're testing against external services that are configured with the environment variables.
+        } else if (!rabbitMQContainer || !neo4JContainer) {
             startTestContainers()
         }
     }
@@ -23,7 +29,7 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
         Network network = Network.newNetwork()
 
-        MessagingSpecification.log.info("Starting RabbitMQ Container")
+        log.info("Starting RabbitMQ Container")
 
         rabbitMQContainer = new GenericContainer("rabbitmq:management-alpine")
                 .withNetwork(network)
@@ -37,10 +43,10 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
         System.setProperty(PreferenceType.RABBITMQ_PORT.name(), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_MANAGEMENT_PORT))
 
-        MessagingSpecification.log.info "RabbitMQ Docker container running at  - http://localhost:${rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_MANAGEMENT_PORT))}"
+        log.info "RabbitMQ Docker container running at  - http://localhost:${rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_MANAGEMENT_PORT))}"
 
 
-        MessagingSpecification.log.info("Starting Neo4J Container")
+        log.info("Starting Neo4J Container")
         neo4JContainer = new GenericContainer("neo4j:4.0.3")
                 .withNetwork(network)
                 .withNetworkAliases("neo4j")
@@ -53,8 +59,8 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
         neo4JContainer.start()
 
-        MessagingSpecification.log.info "Neo4J Docker Container - Bolt bolt://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT))}"
-        MessagingSpecification.log.info "Neo4J Docker Container - Web http://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_WEB_PORT))}"
+        log.info "Neo4J Docker Container - Bolt bolt://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT))}"
+        log.info "Neo4J Docker Container - Web http://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_WEB_PORT))}"
 
         System.setProperty(PreferenceType.NEO4J_BOLT_PORT.name(), neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)).toString())
         System.setProperty(PreferenceType.RABBITMQ_PORT.name(), rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT)).toString())
