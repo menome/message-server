@@ -68,6 +68,8 @@ dependencies {
     implementation("io.projectreactor:reactor-test:3.3.5.RELEASE")
 
     implementation("com.github.everit-org.json-schema:org.everit.json.schema:1.12.1")
+    implementation("redis.clients:jedis:3.3.0")
+
 
 
 }

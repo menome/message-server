@@ -4,7 +4,10 @@ import com.google.gson.Gson
 import com.menome.messageProcessor.InvalidMessageException
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.messageProcessor.Neo4JStatements
+import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
+import com.menome.util.PreferenceType
+import com.menome.util.Redis
 import org.apache.commons.lang3.time.StopWatch
 import org.everit.json.schema.ValidationException
 import org.neo4j.driver.Driver
@@ -66,7 +69,7 @@ class MessageBatchProcessor {
                 } else {
                     errors.add(new MessageError(new InvalidMessageException("Missing NodeType").toString(), jsonMessage))
                 }
-            } catch (ValidationException ex){
+            } catch (ValidationException ex) {
                 errors.add(new MessageError(ex.errorMessage, jsonMessage))
             }
         }
@@ -121,6 +124,8 @@ class MessageBatchProcessor {
 
         List<MessageError> errors = []
         Map<String, HashSet> uniqueParameters = [:]
+        def connection = Redis.connection()
+
 
         // Initialize unique map with the set of parameters names from the first message. All messages in the messages parameter are of the same
         // type so we can assume they will all have the same set of parameters
@@ -138,9 +143,24 @@ class MessageBatchProcessor {
             statements.connectionMerge.each() {
                 String key = MessageProcessor.deriveMessageTypeFromStatement(it)
                 Map<String, String> parmsForStatement = parmsFromMessage.get(key)
-                HashSet parmset = uniqueParameters.get(key)
-                parmset.add(parmsForStatement)
-                uniqueParameters.put(key, parmset)
+                Boolean addStatement = Boolean.TRUE
+                if (ApplicationConfiguration.getString(PreferenceType.USE_REDIS_CACHE) == "Y") {
+                    String parmsMapHashCode = parmsForStatement.hashCode().toString()
+
+                    if (connection.get(parmsMapHashCode)) {
+                        addStatement = Boolean.FALSE
+                        log.debug("Redis cache hit for parameter hash:{}", parmsMapHashCode)
+                    } else {
+                        log.debug("Redis cache miss for parameter hash:{}", parmsMapHashCode)
+                        connection.set(parmsMapHashCode, "Y")
+                    }
+                }
+
+                if (addStatement) {
+                    HashSet parmset = uniqueParameters.get(key)
+                    parmset.add(parmsForStatement)
+                    uniqueParameters.put(key, parmset)
+                }
             }
         }
 
@@ -155,7 +175,7 @@ class MessageBatchProcessor {
             }
 
             try {
-                Neo4J.executeStatementListInSession(List.of(unwind),driver.session(),neo4JParameters)
+                Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), neo4JParameters)
             } catch (Exception e) {
                 if (messages.size() > 1) {
                     List<String> segments = messages.collate(messages.size().intdiv(2), true)
@@ -168,6 +188,10 @@ class MessageBatchProcessor {
                     errors.add(new MessageError(e.toString(), messages[0]))
                 }
             }
+        }
+
+        if (connection){
+            connection.close()
         }
         errors
     }
