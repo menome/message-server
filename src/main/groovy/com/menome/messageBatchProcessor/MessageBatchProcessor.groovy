@@ -155,13 +155,23 @@ class MessageBatchProcessor {
             }
 
             try {
-                Neo4J.run(driver, unwind, neo4JParameters)
+                Neo4J.executeStatementListInSession(List.of(unwind),driver.session(),neo4JParameters)
             } catch (Exception e) {
-                errors.add(new MessageError(e.toString(), unwind))
+                if (messages.size() > 1) {
+                    List<String> segments = messages.collate(messages.size().intdiv(2), true)
+                    segments.each() { segmentMessages ->
+                        Neo4JStatements segmentStatements = MessageProcessor.process(segmentMessages[0])
+                        errors.addAll(processConnectionMerges(segmentMessages, segmentStatements, driver))
+                        return errors
+                    }
+                } else {
+                    errors.add(new MessageError(e.toString(), messages[0]))
+                }
             }
         }
         errors
     }
+
 
     private static void processIndexes(List<String> messages, Driver driver) {
 

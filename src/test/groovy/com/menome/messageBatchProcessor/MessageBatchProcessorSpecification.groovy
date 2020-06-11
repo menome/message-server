@@ -119,7 +119,7 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
         when:
         MessageBatchProcessor.process(List.of(victoriaEmployee), driver)
         Result result = Neo4J.run(driver, "CALL db.indexes()")
-        List <Record> records = result.collect()
+        List<Record> records = result.collect()
         then:
         checkIfIndexExistsInRecordSet(records, ["Employee"], ["Email", "EmployeeId"])
         checkIfIndexExistsInRecordSet(records, ["Card"], ["Email", "EmployeeId"])
@@ -160,11 +160,11 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
         driver.close()
     }
 
-    def "batch with multiple connections of same type different values"(){
+    def "batch with multiple connections of same type different values"() {
         given:
         Driver driver = Neo4J.openDriver()
         when:
-        MessageBatchProcessor.process(List.of(calgaryEmployee,victoriaEmployee,calgaryEmployee),driver)
+        MessageBatchProcessor.process(List.of(calgaryEmployee, victoriaEmployee, calgaryEmployee), driver)
         then:
         2 == Neo4J.run(driver, "match(o:Office) return count(o) as count").single().get("count").asInt()
         1 == Neo4J.run(driver, "match(o:Office) where o.City=\"Victoria\" return count(o) as count").single().get("count").asInt()
@@ -173,7 +173,7 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
         driver.close()
     }
 
-    def "error expected from bad connection node"(){
+    def "error expected from bad connection node"() {
         given:
         Driver driver = Neo4J.openDriver()
         when:
@@ -189,23 +189,12 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
 
     }
 
-    def "message with missing node type expect error tuple"() {
-    }
-
-    def "node types cant have spaces"() {
-
-    }
-
-    def "properties can't have spaces"() {
-    }
-
-
 
     boolean checkIfIndexExistsInRecordSet(List<Record> records, List<String> label, List<String> properties) {
         boolean rc = false;
         records.each() { record ->
             def map = record.asMap()
-            if (map.get("labelsOrTypes") == label && map.get("properties") == properties){
+            if (map.get("labelsOrTypes") == label && map.get("properties") == properties) {
                 rc = true
             }
         }
