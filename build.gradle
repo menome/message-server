@@ -74,6 +74,10 @@ dependencies {
 
 }
 
+test{
+    forkEvery = 1
+}
+
 test.classpath += configurations.developmentOnly
 
 mainClassName = "com.menome.MessageServerCommand"
