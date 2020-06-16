@@ -15,12 +15,13 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
     static GenericContainer rabbitMQContainer
     static GenericContainer neo4JContainer
+    static GenericContainer redisContainer
 
     def setupSpec() {
         // Start the containers if they need to be and haven't been started yet.
         if (ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "N") {
             // Nothing to do here. We're assuming the containers are running outside the test or we're testing against external services that are configured with the environment variables.
-        } else if (!rabbitMQContainer || !neo4JContainer) {
+        } else if (!rabbitMQContainer || !neo4JContainer || !redisContainer) {
             startTestContainers()
         }
     }
@@ -64,5 +65,19 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
         System.setProperty(PreferenceType.NEO4J_BOLT_PORT.name(), neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)).toString())
         System.setProperty(PreferenceType.RABBITMQ_PORT.name(), rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT)).toString())
+
+
+        log.info("Starting Redis Container")
+        redisContainer = new GenericContainer("redis")
+                .withNetwork(network)
+                .withNetworkAliases("redis")
+                .withExposedPorts(ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT))
+
+        redisContainer.start()
+        log.info "Redis Docker container running at  - http://localhost:${redisContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT))}"
+
+        System.setProperty(PreferenceType.REDIS_PORT.name(), redisContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT)).toString())
+
+
     }
 }

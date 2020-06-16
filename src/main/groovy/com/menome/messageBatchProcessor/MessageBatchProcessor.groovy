@@ -4,9 +4,7 @@ import com.google.gson.Gson
 import com.menome.messageProcessor.InvalidMessageException
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.messageProcessor.Neo4JStatements
-import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
-import com.menome.util.PreferenceType
 import com.menome.util.Redis
 import org.apache.commons.lang3.time.StopWatch
 import org.everit.json.schema.ValidationException
@@ -144,16 +142,14 @@ class MessageBatchProcessor {
                 String key = MessageProcessor.deriveMessageTypeFromStatement(it)
                 Map<String, String> parmsForStatement = parmsFromMessage.get(key)
                 Boolean addStatement = Boolean.TRUE
-                if (ApplicationConfiguration.getString(PreferenceType.USE_REDIS_CACHE) == "Y") {
-                    String parmsMapHashCode = parmsForStatement.hashCode().toString()
+                String parmsMapHashCode = parmsForStatement.hashCode().toString()
 
-                    if (connection.get(parmsMapHashCode)) {
-                        addStatement = Boolean.FALSE
-                        log.debug("Redis cache hit for parameter hash:{}", parmsMapHashCode)
-                    } else {
-                        log.debug("Redis cache miss for parameter hash:{}", parmsMapHashCode)
-                        connection.set(parmsMapHashCode, "Y")
-                    }
+                if (connection.get(parmsMapHashCode)) {
+                    addStatement = Boolean.FALSE
+                    log.debug("Redis cache hit for parameter hash:{}", parmsMapHashCode)
+                } else {
+                    log.debug("Redis cache miss for parameter hash:{}", parmsMapHashCode)
+                    connection.set(parmsMapHashCode, "Y")
                 }
 
                 if (addStatement) {
@@ -190,7 +186,7 @@ class MessageBatchProcessor {
             }
         }
 
-        if (connection){
+        if (connection) {
             connection.close()
         }
         errors
