@@ -15,7 +15,7 @@ pipeline {
                 script {
                     docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-toddcostella') {
 
-                        def customImage = docker.build("toddcostella/message-server")
+                        def customImage = docker.build("menome/message-server")
                         customImage.push("version-${env.BUILD_NUMBER}")
                         customImage.push("latest")
                     }
