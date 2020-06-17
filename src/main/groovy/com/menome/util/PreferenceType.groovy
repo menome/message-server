@@ -17,7 +17,8 @@ enum PreferenceType {
     NEO4J_PASSWORD("password"),
     REDIS_HOST("localhost"),
     REDIS_PORT("6379"),
-    RUN_WITH_TEST_CONTAINERS("Y")
+    RUN_WITH_TEST_CONTAINERS("Y"),
+    USE_REDIS_CACHE("Y")
 
 
     String defaultValue;

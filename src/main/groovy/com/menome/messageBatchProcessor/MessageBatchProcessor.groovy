@@ -4,7 +4,9 @@ import com.google.gson.Gson
 import com.menome.messageProcessor.InvalidMessageException
 import com.menome.messageProcessor.MessageProcessor
 import com.menome.messageProcessor.Neo4JStatements
+import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
+import com.menome.util.PreferenceType
 import com.menome.util.Redis
 import org.apache.commons.lang3.time.StopWatch
 import org.everit.json.schema.ValidationException
@@ -142,16 +144,21 @@ class MessageBatchProcessor {
                 String key = MessageProcessor.deriveMessageTypeFromStatement(it)
                 Map<String, String> parmsForStatement = parmsFromMessage.get(key)
                 Boolean addStatement = Boolean.TRUE
-                String parmsMapHashCode = parmsForStatement.hashCode().toString()
+                if (ApplicationConfiguration.getString(PreferenceType.USE_REDIS_CACHE) == "Y") {
+                    // Create a second map that also includes the NodeType to avoid the case where two different node types share the exact same parameters
+                    Map<String, String> parmsToHash = new HashMap<>(parmsForStatement)
+                    parmsToHash.put("NodeType", key)
 
-                if (connection.get(parmsMapHashCode)) {
-                    addStatement = Boolean.FALSE
-                    log.debug("Redis cache hit for parameter hash:{}", parmsMapHashCode)
-                } else {
-                    log.debug("Redis cache miss for parameter hash:{}", parmsMapHashCode)
-                    connection.set(parmsMapHashCode, "Y")
+                    String redisKey = key + "." + parmsToHash.hashCode().toString()
+
+                    if (connection.get(redisKey)) {
+                        addStatement = Boolean.FALSE
+                        log.debug("Redis cache hit for parameter hash:{}", redisKey)
+                    } else {
+                        log.debug("Redis cache miss for parameter hash:{}", redisKey)
+                        connection.set(redisKey, "Y")
+                    }
                 }
-
                 if (addStatement) {
                     HashSet parmset = uniqueParameters.get(key)
                     parmset.add(parmsForStatement)

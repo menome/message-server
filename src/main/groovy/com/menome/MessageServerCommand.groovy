@@ -3,10 +3,7 @@ package com.menome
 import com.menome.messageBatchProcessor.MessageBatchProcessor
 import com.menome.messageBatchProcessor.MessageBatchResult
 import com.menome.messageBatchProcessor.MessageBatchSummary
-import com.menome.util.ApplicationConfiguration
-import com.menome.util.Neo4J
-import com.menome.util.PreferenceType
-import com.menome.util.RabbitMQ
+import com.menome.util.*
 import com.rabbitmq.client.Address
 import com.rabbitmq.client.ConnectionFactory
 import io.micronaut.configuration.picocli.PicocliRunner
@@ -21,8 +18,6 @@ import reactor.rabbitmq.RabbitFlux
 import reactor.rabbitmq.ReceiverOptions
 
 import java.time.Duration
-
-
 
 @Command(name = 'messageServer'
         , description = '...'
@@ -56,6 +51,7 @@ class MessageServerCommand implements Runnable {
 
         ConnectionFactory rabbitConnectionFactory = connectToRabbitMQ()
         Driver driver = connectToNeo4J()
+        connectToRedis()
 
         ReceiverOptions receiverOptions = new ReceiverOptions()
                 .connectionFactory(rabbitConnectionFactory)
@@ -77,7 +73,7 @@ class MessageServerCommand implements Runnable {
 
     static void displayBanner() {
         String[] banner = new CommandLine(new MessageServerCommand()).commandSpec.usageMessage().header()
-        banner.each(){line->
+        banner.each() { line ->
             log.info(CommandLine.Help.Ansi.AUTO.string(line))
         }
     }
@@ -107,6 +103,15 @@ class MessageServerCommand implements Runnable {
             System.exit(-1)
         }
         driver
+    }
+
+    static void connectToRedis() {
+        if (Redis.connectionOk()) {
+            log.info("Connected to Redis cache server OK")
+        } else {
+            log.info("Unable to connect to Redis cache. Connection node caching is disabled")
+            System.setProperty(PreferenceType.USE_REDIS_CACHE.name(), "N")
+        }
     }
 
 

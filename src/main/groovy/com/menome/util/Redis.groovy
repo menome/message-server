@@ -14,7 +14,7 @@ class Redis {
 
     static Jedis connection() {
         Jedis jedis = null
-        if (pool) {
+        if (ApplicationConfiguration.getString(PreferenceType.USE_REDIS_CACHE) == "Y" && pool) {
             jedis = pool.getResource()
         }
         jedis
