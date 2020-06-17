@@ -257,6 +257,10 @@ These are the environment variables that are used by the message server to confi
 |NEO4J_BOLT_PORT     |7687              |
 |NEO4J_USER          |neo4j             |
 |NEO4J_PASSWORD      |password          |
+|                    |                  |
+|REDIS_HOST          |localhost         |
+|REDIS_PORT          |6379              |
+
 
 ### Jenkins Configuration
 There is a Jenkins pipeline defined for the project (See Jenkinsfile in the root of the project)
