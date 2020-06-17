@@ -36,6 +36,7 @@ class RabbitMQVolumeSpecification extends SymendMessagingSpecification {
         rabbitConnectionFactory.setMetricsCollector(metrics)
     }
 
+    @Ignore
     def "write 50,000 Employee Messages to rabbit"() {
         given:
         rabbitConnectionFactory = createRabbitConnectionFactory()
