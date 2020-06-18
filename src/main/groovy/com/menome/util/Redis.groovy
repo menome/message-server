@@ -41,7 +41,9 @@ class Redis {
     }
 
     static JedisPool createConnectionPool() {
-        log.info("Connecting to Redis Host:{} on Port:{}", ApplicationConfiguration.getString(PreferenceType.REDIS_HOST), ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT))
+        if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y")  {
+            log.info("Connecting to Redis Host:{} on Port:{}", ApplicationConfiguration.getString(PreferenceType.REDIS_HOST), ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT))
+        }
         def jedisPool = new JedisPool(new JedisPoolConfig(), ApplicationConfiguration.getString(PreferenceType.REDIS_HOST), ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT))
         jedisPool
     }

@@ -1,6 +1,6 @@
 package com.menome
 
-
+import com.menome.util.PreferenceType
 import com.menome.util.RabbitMQ
 import com.menome.util.messageBuilder.Connection
 import com.menome.util.messageBuilder.MessageBuilder
@@ -14,6 +14,10 @@ import java.time.LocalDateTime
 import java.time.Month
 
 abstract class MessagingSpecification extends Specification {
+    {
+        System.setProperty(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT.name(), "N")
+    }
+
 
     static Logger log = LoggerFactory.getLogger(MessagingSpecification.class)
 

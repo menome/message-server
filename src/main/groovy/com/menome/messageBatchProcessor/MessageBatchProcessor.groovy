@@ -179,8 +179,10 @@ class MessageBatchProcessor {
                 log.debug(new Gson().toJson(neo4JParameters))
             }
 
+            def neo4JSession = driver.session()
+
             try {
-                Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), neo4JParameters)
+                Neo4J.executeStatementListInSession(List.of(unwind), neo4JSession, neo4JParameters)
             } catch (Exception e) {
                 if (messages.size() > 1) {
                     List<String> segments = messages.collate(messages.size().intdiv(2), true)
@@ -192,6 +194,8 @@ class MessageBatchProcessor {
                 } else {
                     errors.add(new MessageError(e.toString(), messages[0]))
                 }
+            } finally{
+                neo4JSession.close()
             }
         }
 

@@ -1,6 +1,8 @@
 package com.menome.messageProcessor
 
 import com.google.gson.Gson
+import com.menome.util.ApplicationConfiguration
+import com.menome.util.PreferenceType
 import org.everit.json.schema.Schema
 import org.everit.json.schema.loader.SchemaLoader
 import org.json.JSONObject
@@ -23,13 +25,15 @@ class MessageProcessor {
         } catch (Exception ignore) {
             try {
                 jsonSchema = getClass().getResourceAsStream("/harvester_schema.json").text
-            } catch (Exception e) {
+            } catch (Exception ignored) {
                 log.info("MessageProcessor validation disabled. Schema harvester_schema.json cannot be located. ")
             }
         }
 
         if (jsonSchema != null) {
-            log.info("MessageProcessor schema validation enabled. harvester_schema.json will be used to validate all incoming messages. ")
+            if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y")  {
+                log.info("MessageProcessor schema validation enabled. harvester_schema.json will be used to validate all incoming messages. ")
+            }
             rawSchema = new JSONObject(new JSONTokener(jsonSchema))
             schema = SchemaLoader.load(rawSchema)
         }

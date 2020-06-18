@@ -23,7 +23,9 @@ class RabbitMQ {
         rabbitConnectionFactory.username = username
         rabbitConnectionFactory.password = password
 
-        log.info("Connecting to RabbitMQ server {} on port {} with user {}", host, port, username)
+        if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y")  {
+            log.info("Connecting to RabbitMQ server {} on port {} with user {}", host, port, username)
+        }
 
         rabbitConnectionFactory
     }

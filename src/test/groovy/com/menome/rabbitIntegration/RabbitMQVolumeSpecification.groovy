@@ -53,7 +53,6 @@ class RabbitMQVolumeSpecification extends SymendMessagingSpecification {
         await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == messagesToWrite }
         then:
         1 == 1
-        println("Done...")
     }
 
 
@@ -77,7 +76,6 @@ class RabbitMQVolumeSpecification extends SymendMessagingSpecification {
         await().atMost(2, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == 250_000 }
         then:
         1 == 1
-        println("Done...")
 
     }
 }

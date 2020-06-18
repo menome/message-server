@@ -18,7 +18,8 @@ enum PreferenceType {
     REDIS_HOST("localhost"),
     REDIS_PORT("6379"),
     RUN_WITH_TEST_CONTAINERS("Y"),
-    USE_REDIS_CACHE("Y")
+    USE_REDIS_CACHE("Y"),
+    SHOW_CONNECTION_LOG_OUTPUT("Y")
 
 
     String defaultValue;

@@ -28,8 +28,11 @@ class Neo4J {
         def username = ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)
         def password = ApplicationConfiguration.getString(PreferenceType.NEO4J_PASSWORD)
         String boltURL = "bolt://$host:$boltPort"
-        log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
+        if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y")  {
+            log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
+        }
         Config config = Config.builder().withLogging(new JULogging(Level.WARNING)).build()
+
         GraphDatabase.driver(boltURL, AuthTokens.basic(username, password), config)
     }
 
@@ -41,7 +44,7 @@ class Neo4J {
     static Result run(Driver driver, String statement, Map parameters) {
         Session session = driver.session()
         def result = session.run(statement, parameters)
-        return result
+         result
     }
 
 

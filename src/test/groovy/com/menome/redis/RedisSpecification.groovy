@@ -1,5 +1,6 @@
 package com.menome.redis
 
+import com.menome.MessagingSpecification
 import com.menome.util.ApplicationConfiguration
 import com.menome.util.PreferenceType
 import com.menome.util.Redis
@@ -7,9 +8,8 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.Network
-import spock.lang.Specification
 
-class RedisSpecification extends Specification {
+class RedisSpecification extends MessagingSpecification {
 
     static Logger log = LoggerFactory.getLogger(RedisSpecification.class)
 
