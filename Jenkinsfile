@@ -27,6 +27,7 @@ pipeline {
     post {
         always {
             junit 'build/**/*.xml'
+            mattermostSend channel: "#80 Symend Alerts", message: "Testing"
         }
     }
 }
