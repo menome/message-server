@@ -135,16 +135,18 @@ class MessageBatchProcessor {
                 uniqueParameters.put(key, new HashSet())
             }
         }
-
+        def useRedisCache = ApplicationConfiguration.getString(PreferenceType.USE_REDIS_CACHE) == "Y"
         //Iterate over all of the messages getting the parameters for each of the connections. We build up a unique parameters by adding the
         // parameters to the hashset associated with the parameter type. There is no need to merge the exact same parameters over and over again
+
         messages.each() { String message ->
             Map<String, Map<String, String>> parmsFromMessage = MessageProcessor.processParameterForConnections(message)
             statements.connectionMerge.each() {
                 String key = MessageProcessor.deriveMessageTypeFromStatement(it)
                 Map<String, String> parmsForStatement = parmsFromMessage.get(key)
                 Boolean addStatement = Boolean.TRUE
-                if (ApplicationConfiguration.getString(PreferenceType.USE_REDIS_CACHE) == "Y") {
+
+                if (useRedisCache) {
                     // Create a second map that also includes the NodeType to avoid the case where two different node types share the exact same parameters
                     Map<String, String> parmsToHash = new HashMap<>(parmsForStatement)
                     parmsToHash.put("NodeType", key)
