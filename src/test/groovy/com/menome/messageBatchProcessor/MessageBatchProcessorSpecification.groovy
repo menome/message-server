@@ -1,6 +1,5 @@
 package com.menome.messageBatchProcessor
 
-
 import com.menome.MessagingWithTestContainersSpecification
 import com.menome.util.Neo4J
 import com.menome.util.Redis
@@ -8,19 +7,12 @@ import org.neo4j.driver.Driver
 import org.neo4j.driver.Record
 import org.neo4j.driver.Result
 
-import java.util.concurrent.TimeUnit
-
-import static org.awaitility.Awaitility.await
 import static org.awaitility.Awaitility.given
 
 class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpecification {
 
     def setup() {
-        def driver = Neo4J.openDriver()
-        Neo4J.run(driver, "match (n) where n.SourceSystem='menome_test_framework' detach delete n")
-        await().atMost(1, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0 }
-        driver.close()
-
+        Neo4J.deleteAllTestNodes()
         Redis.clearCache()
     }
 

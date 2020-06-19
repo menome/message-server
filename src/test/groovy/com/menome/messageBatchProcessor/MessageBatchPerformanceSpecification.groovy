@@ -8,9 +8,6 @@ import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
 
 import java.time.Duration
-import java.util.concurrent.TimeUnit
-
-import static org.awaitility.Awaitility.await
 
 class MessageBatchPerformanceSpecification extends SymendMessagingSpecification {
 
@@ -18,9 +15,7 @@ class MessageBatchPerformanceSpecification extends SymendMessagingSpecification 
     static int BATCH_SIZE = 5_000
 
     def setup() {
-        def driver = Neo4J.openDriver()
-        Neo4J.run(driver, "match (n) where n.SourceSystem='menome_test_framework' detach delete n")
-        await().atMost(1, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0 }
+        Neo4J.deleteAllTestNodes()
     }
 
     def testMessageCreate(int numberOfNodes, int numberOfConnections, int numberOfPrimaryNodeProperties) {

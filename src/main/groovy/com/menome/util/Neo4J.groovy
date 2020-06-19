@@ -6,7 +6,10 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 
+import java.util.concurrent.TimeUnit
 import java.util.logging.Level
+
+import static org.awaitility.Awaitility.await
 
 
 class Neo4J {
@@ -28,7 +31,7 @@ class Neo4J {
         def username = ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)
         def password = ApplicationConfiguration.getString(PreferenceType.NEO4J_PASSWORD)
         String boltURL = "bolt://$host:$boltPort"
-        if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y")  {
+        if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y") {
             log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
         }
         Config config = Config.builder().withLogging(new JULogging(Level.WARNING)).build()
@@ -44,7 +47,7 @@ class Neo4J {
     static Result run(Driver driver, String statement, Map parameters) {
         Session session = driver.session()
         def result = session.run(statement, parameters)
-         result
+        result
     }
 
 
@@ -64,5 +67,12 @@ class Neo4J {
             }
         })
     }
+
+    static void deleteAllTestNodes() {
+        def driver = openDriver()
+        run(driver, "match (n) where n.SourceSystem='menome_test_framework' detach delete n")
+        await().atMost(1, TimeUnit.MINUTES).until { run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0 }
+    }
+
 
 }

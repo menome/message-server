@@ -41,10 +41,11 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
                 .withEnv("RABBITMQ_DEFAULT_PASS", ApplicationConfiguration.getString(PreferenceType.RABBITMQ_PASSWORD))
 
         rabbitMQContainer.start()
+        System.setProperty(PreferenceType.RABBITMQ_PORT.name(), rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT)).toString())
+        System.setProperty(PreferenceType.RABBITMQ_MANAGEMENT_PORT.name(), rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_MANAGEMENT_PORT)).toString())
 
-        System.setProperty(PreferenceType.RABBITMQ_PORT.name(), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_MANAGEMENT_PORT))
 
-        log.info "RabbitMQ Docker container running at  - http://localhost:${rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_MANAGEMENT_PORT))}"
+        log.info "RabbitMQ Docker container running at  - http://localhost:${ApplicationConfiguration.getString(PreferenceType.RABBITMQ_MANAGEMENT_PORT)}"
 
 
         log.info("Starting Neo4J Container")
@@ -64,7 +65,6 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
         log.info "Neo4J Docker Container - Web http://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_WEB_PORT))}"
 
         System.setProperty(PreferenceType.NEO4J_BOLT_PORT.name(), neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)).toString())
-        System.setProperty(PreferenceType.RABBITMQ_PORT.name(), rabbitMQContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT)).toString())
 
 
         log.info("Starting Redis Container")

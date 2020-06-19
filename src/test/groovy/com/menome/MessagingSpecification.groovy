@@ -1,5 +1,6 @@
 package com.menome
 
+
 import com.menome.util.PreferenceType
 import com.menome.util.RabbitMQ
 import com.menome.util.messageBuilder.Connection
