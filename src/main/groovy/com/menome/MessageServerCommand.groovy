@@ -58,8 +58,8 @@ class MessageServerCommand implements Runnable {
         // Start the http server for monitoring, health, etc.
         log.info("Starting Monitoring Services")
 
+        System.setProperty("micronaut.server.port",ApplicationConfiguration.getString(PreferenceType.HTTP_SERVER_PORT))
         applicationContext = Micronaut.run(MessageServerCommand.class)
-
 
         ConnectionFactory rabbitConnectionFactory = connectToRabbitMQ()
         Driver driver = connectToNeo4J()

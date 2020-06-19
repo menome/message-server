@@ -19,7 +19,8 @@ enum PreferenceType {
     REDIS_PORT("6379"),
     RUN_WITH_TEST_CONTAINERS("Y"),
     USE_REDIS_CACHE("Y"),
-    SHOW_CONNECTION_LOG_OUTPUT("Y")
+    SHOW_CONNECTION_LOG_OUTPUT("Y"),
+    HTTP_SERVER_PORT("8081")
 
 
     String defaultValue;

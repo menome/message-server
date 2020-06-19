@@ -243,23 +243,26 @@ docker run -p 8080:8080 -e RABBITMQ_HOST=<RABBITMQ_HOST_IP_ADDRESS> -e NEO4J_HOS
 ## Environment/Configuration Variables
 These are the environment variables that are used by the message server to configure the connections to Rabbit MQ and Neo4J. See the ApplicationConfiguration class for the implementation.
 
-|Environment Variable| Default Value    |
-|---                 |---               |
-|RABBITMQ_HOST       |127.0.0.1         |
-|RABBITMQ_PORT       |5672              |
-|RABBITMQ_USER       |menome            |
-|RABBITMQ_PASSWORD   |menome            |
-|RABBITMQ_QUEUE      |test_queue        |
-|RABBITMQ_BATCHSZIE  |5000              |
-|RABBITMQ_EXCHANGE   |test_exchange     |
-|                    |                  |
-|NEO4J_HOST          |localhost         |
-|NEO4J_BOLT_PORT     |7687              |
-|NEO4J_USER          |neo4j             |
-|NEO4J_PASSWORD      |password          |
-|                    |                  |
-|REDIS_HOST          |localhost         |
-|REDIS_PORT          |6379              |
+|Environment Variable       | Default Value    |
+|---                        |---               |
+|RABBITMQ_HOST              |localhost         |
+|RABBITMQ_PORT              |5672              |
+|RABBITMQ_USER              |menome            |
+|RABBITMQ_PASSWORD          |menome            |
+|RABBITMQ_QUEUE             |test_queue        |
+|RABBITMQ_BATCHSZIE         |5000              |
+|RABBITMQ_EXCHANGE          |test_exchange     |
+|                           |                  |
+|NEO4J_HOST                 |localhost         |
+|NEO4J_BOLT_PORT            |7687              |
+|NEO4J_USER                 |neo4j             |
+|NEO4J_PASSWORD             |password          |
+|                           |                  |
+|REDIS_HOST                 |localhost         |
+|REDIS_PORT                 |6379              |
+|                           |                  |
+|SHOW_CONNECTION_LOG_OUTPUT |Y                 |
+|HTTP_SERVER_PORT           |8081              |
 
 
 ### Jenkins Configuration
