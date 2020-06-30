@@ -9,7 +9,7 @@ enum PreferenceType {
     RABBITMQ_QUEUE("test_queue"),
     RABBITMQ_EXCHANGE("test_exchange"),
     RABBITMQ_ROUTE("test_route"),
-    RABBITMQ_BATCHSZIE("5000"),
+    RABBITMQ_BATCHSZIE("500"),
     NEO4J_HOST("localhost"),
     NEO4J_BOLT_PORT("7687"),
     NEO4J_WEB_PORT("7474"),

@@ -1,7 +1,7 @@
 package com.menome.messageServerCommand
 
 import com.menome.MessageServerCommand
-import com.menome.MessagingWithTestContainersSpecification
+import com.menome.SymendMessagingSpecification
 import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
 import com.menome.util.PreferenceType
@@ -11,13 +11,14 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.neo4j.driver.Driver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import spock.lang.Ignore
 import spock.lang.Shared
 
 import java.util.concurrent.TimeUnit
 
 import static org.awaitility.Awaitility.await
 
-class MessageServerCommandSpecification extends MessagingWithTestContainersSpecification {
+class MessageServerCommandSpecification extends SymendMessagingSpecification {
 
     static Logger log = LoggerFactory.getLogger(MessageServerCommandSpecification.class)
 
@@ -76,7 +77,7 @@ class MessageServerCommandSpecification extends MessagingWithTestContainersSpeci
         MessageServerCommand.shutdown()
     }
 
-    def "process 500,000 with two message server instances"() {
+    def "process 500,000 with two message server instances in less thank five minutes"() {
         given:
         def messagesToWrite = 500_000
         writeEmployeeMessages(messagesToWrite)
@@ -85,10 +86,28 @@ class MessageServerCommandSpecification extends MessagingWithTestContainersSpeci
         System.setProperty(PreferenceType.HTTP_SERVER_PORT.name(), "-1")
         MessageServerCommand.main()
 
-        //await().atMost(5, TimeUnit.MINUTES).until { MessageServerCommand.getTotalMessagesProcessedByServer() == messagesToWrite }
         await().atMost(5, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt() == messagesToWrite }
         then:
         messagesToWrite == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+
+        cleanup:
+        MessageServerCommand.shutdown()
+
+    }
+
+    @Ignore
+    def "process 200,000 Symend with two message server instances"() {
+        given:
+        def messagesToWrite = 200_000
+        writeSymendMessages(messagesToWrite)
+        when:
+        MessageServerCommand.main()
+        System.setProperty(PreferenceType.HTTP_SERVER_PORT.name(), "-1")
+        MessageServerCommand.main()
+
+        await().atMost(5, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (e:CollectionEvent) return count(e) as count").single().get("count").asInt() == messagesToWrite }
+        then:
+        messagesToWrite == Neo4J.run(driver, "match (e:CollectionEvent) return count(e) as count").single().get("count").asInt()
 
         cleanup:
         MessageServerCommand.shutdown()
@@ -104,6 +123,20 @@ class MessageServerCommandSpecification extends MessagingWithTestContainersSpeci
             rabbitChannel.basicPublish(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), null, message.getBytes())
         }
         await().atMost(5, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == messagesToWrite }
+    }
+
+    def writeSymendMessages(Integer messagesToWrite) {
+        def rabbitChannel = openRabbitMQChanel(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE),ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE),ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), rabbitConnectionFactory)
+
+        def loopCounter = messagesToWrite / 50_000
+        (1..loopCounter).each {
+            def messages = buildSymendMessages(50_000, Integer.MAX_VALUE, Integer.MAX_VALUE)
+            messages.each { message ->
+                rabbitChannel.basicPublish(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), null, message.getBytes())
+            }
+        }
+        await().atMost(2, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == messagesToWrite}
+
     }
 
 }

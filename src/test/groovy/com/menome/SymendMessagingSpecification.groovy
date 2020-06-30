@@ -7,12 +7,12 @@ import com.menome.util.messageBuilder.MessageBuilder
 import java.time.Instant
 
 class SymendMessagingSpecification extends MessagingWithTestContainersSpecification {
-    List<Connection> accounts
-    List<Connection> activities
-    List<Connection> dialers
-    int ACCOUNT_COUNT = 5000
-    int ACTIVITY_COUNT = 10
-    int DIALER_COUNT = 5000
+    static List<Connection> accounts
+    static List<Connection> activities
+    static List<Connection> dialers
+    static int ACCOUNT_COUNT = 5000
+    static int ACTIVITY_COUNT = 10
+    static int DIALER_COUNT = 5000
 
 
     def setup() {
@@ -22,11 +22,11 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
 
     }
 
-    List<String> buildSymendMessages(int count) {
+    static List<String> buildSymendMessages(int count) {
         buildSymendMessages(count, Integer.MAX_VALUE, Integer.MAX_VALUE)
     }
 
-    List<String> buildSymendMessages(int primaryNodeCount, int connectionCount, int primaryNodePropertyCount) {
+    static List<String> buildSymendMessages(int primaryNodeCount, int connectionCount, int primaryNodePropertyCount) {
         List<String> messages = []
         Random random = new Random()
         (1..primaryNodeCount).each {
@@ -46,7 +46,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         messages
     }
 
-    List<String> buildSymendAccounts(int count) {
+    static List<String> buildSymendAccounts(int count) {
         List<String> accounts = []
         (1..count).each { int accountId ->
             String message = MessageBuilder.builder()
@@ -63,7 +63,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
     }
 
 
-    List<String> buildSymendActivities(count) {
+    static List<String> buildSymendActivities(count) {
         List<String> activities = []
         (1..count).each { int activityCodeId ->
             String activity = MessageBuilder.builder()
@@ -79,7 +79,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         activities
     }
 
-    List<String> buildSymendDialerEntries(count) {
+    static List<String> buildSymendDialerEntries(count) {
         List<String> dialerEntries = []
         (1..count).each { int accountNum ->
             String activity = MessageBuilder.builder()
@@ -96,7 +96,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
     }
 
 
-    Map deriveProperties(int countOfPropertiesToTake) {
+    static Map deriveProperties(int countOfPropertiesToTake) {
         Random random = new Random()
         def today = Instant.now().toString()
         Map<String, Object> properties = [
@@ -146,7 +146,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         properties.take(Integer.min(countOfPropertiesToTake, properties.size()))
     }
 
-    List<Connection> deriveConnections(int connectionCount) {
+    static List<Connection> deriveConnections(int connectionCount) {
 
         Random random = new Random()
 
@@ -158,7 +158,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         connections.take(Integer.min(connectionCount, connections.size()))
     }
 
-    List<Connection> buildAccountList(int count) {
+    static List<Connection> buildAccountList(int count) {
         Random random = new Random()
         List<Connection> connections = []
         (1..count).each {
@@ -169,7 +169,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         connections
     }
 
-    List<Connection> buildActivityList(count) {
+    static List<Connection> buildActivityList(count) {
         Random random = new Random()
         List<Connection> connections = []
         (1..count).each {
@@ -180,7 +180,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         connections
     }
 
-    List<Connection> buildDialerList(count) {
+    static List<Connection> buildDialerList(count) {
         Random random = new Random()
         List<Connection> connections = []
         (1..count).each {

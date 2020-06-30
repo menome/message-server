@@ -20,7 +20,7 @@ class ApplicationConfigurationSpecification extends Specification {
         "test_queue" ==ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE)
         "test_exchange" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE)
         "test_route" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE)
-        5000 == ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE)
+        500 == ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE)
         "localhost" == ApplicationConfiguration.getString(PreferenceType.NEO4J_HOST)
         7687 == ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)
         "neo4j" == ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)
