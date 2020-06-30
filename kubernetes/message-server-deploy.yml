@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: message-server
+  name: message-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: message-server
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: message-server
+    spec:
+      containers:
+        - image: toddcostella/message-server:v1
+          name: message-server
+          resources: {}
+          env:
+            - name: RABBITMQ_HOST
+              value: 192.168.8.181
+            - name: NEO4J_HOST
+              value: 192.168.8.181
