@@ -77,7 +77,7 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
         MessageServerCommand.shutdown()
     }
 
-    def "process 500,000 with two message server instances in less thank five minutes"() {
+    def "process 500,000 with two message server instances in less than five minutes"() {
         given:
         def messagesToWrite = 500_000
         writeEmployeeMessages(messagesToWrite)
