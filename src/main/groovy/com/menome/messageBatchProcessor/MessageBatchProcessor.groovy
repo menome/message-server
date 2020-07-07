@@ -8,6 +8,7 @@ import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
 import com.menome.util.PreferenceType
 import com.menome.util.Redis
+import io.micrometer.core.instrument.MeterRegistry
 import org.apache.commons.lang3.time.StopWatch
 import org.everit.json.schema.ValidationException
 import org.neo4j.driver.Driver
@@ -21,33 +22,61 @@ class MessageBatchProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
 
-    static MessageBatchResult process(List<String> messages, Driver driver) {
-
+    static MessageBatchResult process(List<String> messages, Driver driver, MeterRegistry registry) {
         log.debug(Thread.currentThread().getName() + " " + messages.size())
-        StopWatch timer = new StopWatch()
-        timer.start()
+        StopWatch entireBatchResultTimer = new StopWatch()
+        entireBatchResultTimer.start()
 
         List<MessageError> errors = []
 
+        StopWatch methodTimer = new StopWatch()
+
+        StopWatchWrapper.start(methodTimer)
         def messagesByTypeOrErrorsTuple = groupMessagesByNodeType(messages)
+        StopWatchWrapper.stopAndRecord(methodTimer,"MessageBatchProcessor_groupMessageByNodeType_method",registry)
         Map<String, List<String>> messagesByNodeType = messagesByTypeOrErrorsTuple.first
         errors.addAll(messagesByTypeOrErrorsTuple.second)
 
         messagesByNodeType.each { nodeType, msgs ->
+            StopWatchWrapper.start(methodTimer)
             Neo4JStatements statements = MessageProcessor.process(msgs.get(0))
+            StopWatchWrapper.stopAndRecord(methodTimer,"MessageProcessor_process_method",registry)
+
+            StopWatchWrapper.start(methodTimer)
             processIndexes(msgs, driver)
+            StopWatchWrapper.stopAndRecord(methodTimer,"MessageBatchProcessor_processIndexes_method",registry)
+
+            StopWatchWrapper.start(methodTimer)
             errors.addAll(processConnectionMerges(msgs, statements, driver))
+            StopWatchWrapper.stopAndRecord(methodTimer,"MessageBatchProcessor_processConnectionMerges_method",registry)
+
+            StopWatchWrapper.start(methodTimer)
             errors.addAll(processPrimaryNodeMerges(msgs, statements, driver))
+            StopWatchWrapper.stopAndRecord(methodTimer,"MessageBatchProcessor_processPrimaryNodeMerges_method",registry)
+
         }
-        timer.stop()
+        entireBatchResultTimer.stop()
 
         if (log.isDebugEnabled()) {
             errors.each() { error ->
                 log.debug(error.errorText)
             }
         }
-        def batchSummary = new MessageBatchSummary(messages.size(), errors.size(), Duration.ofMillis(timer.getTime(TimeUnit.MILLISECONDS)))
+        def batchDuration = Duration.ofMillis(entireBatchResultTimer.getTime(TimeUnit.MILLISECONDS))
+
+        def batchSummary = new MessageBatchSummary(messages.size(), errors.size(), batchDuration)
+        if (registry) {
+            registry.timer("MessageBatchProcessor_process_method").record(batchDuration)
+            registry.gauge("MessageBatchProcessor_messages_per_second",batchSummary.rate)
+        }
+
+
         new MessageBatchResult(batchSummary, errors)
+
+    }
+
+    static MessageBatchResult process(List<String> messages, Driver driver) {
+        process(messages, driver, null)
     }
 
 
@@ -194,7 +223,7 @@ class MessageBatchProcessor {
                 } else {
                     errors.add(new MessageError(e.toString(), messages[0]))
                 }
-            } finally{
+            } finally {
                 neo4JSession.close()
             }
         }
@@ -222,4 +251,22 @@ class MessageBatchProcessor {
             }
         }
     }
+}
+
+
+class StopWatchWrapper{
+
+    static def start(StopWatch methodTimer){
+        methodTimer.start()
+    }
+
+    static def stopAndRecord(StopWatch methodTimer, String timerMessage, MeterRegistry registry){
+        methodTimer.stop()
+        if(registry) {
+            registry.timer(timerMessage).record(Duration.ofMillis(methodTimer.getTime(TimeUnit.MILLISECONDS)))
+        }
+        methodTimer.reset()
+
+    }
+
 }

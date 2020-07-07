@@ -6,6 +6,7 @@ import com.menome.messageBatchProcessor.MessageBatchSummary
 import com.menome.util.*
 import com.rabbitmq.client.Address
 import com.rabbitmq.client.ConnectionFactory
+import io.micrometer.core.instrument.MeterRegistry
 import io.micronaut.configuration.picocli.PicocliRunner
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.Micronaut
@@ -38,6 +39,7 @@ class MessageServerCommand implements Runnable {
     static AtomicLong totalErrorsProcessedByServer = new AtomicLong(0)
     static ApplicationContext applicationContext = null
 
+
     static void main(String[] args) throws Exception {
         PicocliRunner.run(MessageServerCommand.class, args)
     }
@@ -46,8 +48,8 @@ class MessageServerCommand implements Runnable {
         startServer()
     }
 
-    static void shutdown(){
-        if (applicationContext){
+    static void shutdown() {
+        if (applicationContext) {
             applicationContext.close()
         }
     }
@@ -58,8 +60,9 @@ class MessageServerCommand implements Runnable {
         // Start the http server for monitoring, health, etc.
         log.info("Starting Monitoring Services")
 
-        System.setProperty("micronaut.server.port",ApplicationConfiguration.getString(PreferenceType.HTTP_SERVER_PORT))
+        System.setProperty("micronaut.server.port", ApplicationConfiguration.getString(PreferenceType.HTTP_SERVER_PORT))
         applicationContext = Micronaut.run(MessageServerCommand.class)
+        MeterRegistry meterRegistry = applicationContext.getBean(MeterRegistry)
 
         ConnectionFactory rabbitConnectionFactory = connectToRabbitMQ()
         Driver driver = connectToNeo4J()
@@ -67,7 +70,7 @@ class MessageServerCommand implements Runnable {
 
         ReceiverOptions receiverOptions = new ReceiverOptions()
                 .connectionFactory(rabbitConnectionFactory)
-                .connectionSupplier({ cf -> cf.newConnection([new Address(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_HOST),ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT))], ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE)) })
+                .connectionSupplier({ cf -> cf.newConnection([new Address(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_HOST), ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT))], ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE)) })
 
 
         log.info("Message Server waiting for messages on queue {} processing messages with a batch size of {}", ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE))
@@ -75,7 +78,7 @@ class MessageServerCommand implements Runnable {
         RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE))
                 .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
                 .bufferTimeout(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE), Duration.ofSeconds(2))
-                .map({ messages -> MessageBatchProcessor.process(messages, driver) })
+                .map({ messages -> MessageBatchProcessor.process(messages, driver,meterRegistry) })
                 .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
                 .map({ messageBatchResult -> updateServerStats(messageBatchResult) })
                 .subscribe()

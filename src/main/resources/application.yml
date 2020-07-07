@@ -1,13 +1,15 @@
+endpoints:
+  prometheus:
+    sensitive: false
 micronaut:
   application:
     name: messageServer
   metrics:
     enabled: true
-  endpoints:
-    all:
-      enabled: true
-      sensitive: false
-    stop:
-      enabled: false
+    export:
+      prometheus:
+        enabled: true
+        descriptions: true
+        step: PT1M
   server:
     port: 8080

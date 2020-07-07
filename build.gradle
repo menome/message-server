@@ -10,6 +10,7 @@ group "com.menome"
 
 repositories {
     mavenCentral()
+    jcenter()
     maven {
         url = "https://jitpack.io"
     }
@@ -45,12 +46,14 @@ dependencies {
     }
     testImplementation("io.micronaut.test:micronaut-test-spock")
     implementation("io.micronaut:micronaut-http-server-netty")
-    implementation("io.micronaut:micronaut-management")
 
     implementation("com.google.code.gson:gson:2.8.5")
-    //compile group: 'com.google.code.gson', name: 'gson', version: '2.8.5'
 
-    compile "io.micronaut.configuration:micronaut-micrometer-core"
+    implementation("io.micronaut:micronaut-management")
+    implementation("io.micronaut.configuration:micronaut-micrometer-core")
+    implementation 'io.micronaut.micrometer:micronaut-micrometer-registry-prometheus:2.0.0'
+
+
     implementation("io.micronaut.cache:micronaut-cache-core")
 
     implementation("org.apache.commons:commons-lang3:3.10")

@@ -13,6 +13,10 @@
         <appender-ref ref="STDOUT"/>
     </logger>
 
+    <logger name="io.micronaut.context" level="info" additivity="false">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+
 
     <root level="info">
         <appender-ref ref="STDOUT" />
