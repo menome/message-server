@@ -60,12 +60,25 @@ class Neo4J {
         statements.each() {
             statement += it + " \n"
         }
-        session.writeTransaction(new TransactionWork() {
-            @Override
-            execute(Transaction tx) {
-                tx.run(statement, parameters)
+
+        def retryCount = 2
+        def retries = 0
+        def success = false
+        def lastException = null
+        while (!success && retries < retryCount) {
+            try {
+                def transaction = session.beginTransaction()
+                transaction.run(statement, parameters)
+                transaction.commit()
+                success = true
+            } catch (Exception exception) {
+                retries++
+                lastException = exception
             }
-        })
+        }
+        if (!success) {
+            throw lastException
+        }
     }
 
     static void deleteAllTestNodes() {
