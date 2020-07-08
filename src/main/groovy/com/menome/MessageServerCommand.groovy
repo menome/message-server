@@ -20,7 +20,10 @@ import reactor.rabbitmq.RabbitFlux
 import reactor.rabbitmq.ReceiverOptions
 
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+
+import static org.awaitility.Awaitility.await
 
 @Command(name = 'messageServer'
         , description = '...'
@@ -96,17 +99,20 @@ class MessageServerCommand implements Runnable {
 
     private static ConnectionFactory connectToRabbitMQ() {
         ConnectionFactory rabbitConnectionFactory = RabbitMQ.createRabbitConnectionFactory()
-        if (RabbitMQ.connectionOk(rabbitConnectionFactory)) {
+        try {
+            await().atMost(1, TimeUnit.MINUTES).until { RabbitMQ.connectionOk(rabbitConnectionFactory) }
             log.info("Connected to Rabbit MQ Server OK")
-        } else {
+        } catch (Exception ex){
             log.error("Unable to connect to Rabbit MQ Server")
             System.exit(-1)
         }
+
         rabbitConnectionFactory
     }
 
     static Driver connectToNeo4J() {
         Driver driver = null
+        await().atMost(1, TimeUnit.MINUTES).until { Neo4J.connectionOk() }
         if (Neo4J.connectionOk()) {
             driver = Neo4J.openDriver()
             def version = Neo4J.version()

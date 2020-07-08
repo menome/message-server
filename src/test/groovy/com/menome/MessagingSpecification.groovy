@@ -19,7 +19,6 @@ abstract class MessagingSpecification extends Specification {
         System.setProperty(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT.name(), "N")
     }
 
-
     static Logger log = LoggerFactory.getLogger(MessagingSpecification.class)
 
     protected static String simpleMessage = MessageBuilder.builder()

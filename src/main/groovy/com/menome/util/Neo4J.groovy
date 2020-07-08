@@ -13,6 +13,7 @@ import static org.awaitility.Awaitility.await
 class Neo4J {
 
     static Logger log = LoggerFactory.getLogger(Neo4J.class)
+    static boolean connectionInformationDisplayed = Boolean.FALSE
 
     static boolean connectionOk() {
         boolean connectionOk
@@ -54,8 +55,10 @@ class Neo4J {
             protocol = "bolt://"
         }
         String boltURL = "$protocol$host:$boltPort"
-        if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y") {
+        // Only display the log message once per "session"
+        if ((ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y") && !connectionInformationDisplayed) {
             log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
+            connectionInformationDisplayed = true
         }
         Config config = Config.builder().withLogging(new JULogging(Level.WARNING)).build()
 
