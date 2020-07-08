@@ -78,7 +78,7 @@ class MessageServerCommand implements Runnable {
         RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE))
                 .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
                 .bufferTimeout(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE), Duration.ofSeconds(2))
-                .map({ messages -> MessageBatchProcessor.process(messages, driver,meterRegistry) })
+                .map({ messages -> MessageBatchProcessor.process(messages, driver, meterRegistry) })
                 .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
                 .map({ messageBatchResult -> updateServerStats(messageBatchResult) })
                 .subscribe()
@@ -107,14 +107,12 @@ class MessageServerCommand implements Runnable {
 
     static Driver connectToNeo4J() {
         Driver driver = null
-        try {
+        if (Neo4J.connectionOk()) {
             driver = Neo4J.openDriver()
-            def result = Neo4J.run(driver, "call dbms.components() yield name, versions, edition")
-            def record = result.single()
-            def version = record.get("versions").values()[0].asString()
-            def edition = record.get("edition").asString()
+            def version = Neo4J.version()
+            def edition = Neo4J.edition()
             log.info("Connected to Neo4J Database Server OK - version:{} edition:{}", version, edition)
-        } catch (Exception ignored) {
+        } else {
             log.error("Unable to connect to Neo4J Database Server")
             System.exit(-1)
         }

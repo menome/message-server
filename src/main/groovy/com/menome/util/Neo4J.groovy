@@ -4,33 +4,56 @@ import org.neo4j.driver.*
 import org.neo4j.driver.internal.logging.JULogging
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.testcontainers.containers.GenericContainer
 
 import java.util.concurrent.TimeUnit
 import java.util.logging.Level
 
 import static org.awaitility.Awaitility.await
 
-
 class Neo4J {
 
     static Logger log = LoggerFactory.getLogger(Neo4J.class)
 
-    static Driver openDriver(GenericContainer neo4JContainer) {
-        def host = ApplicationConfiguration.getString(PreferenceType.NEO4J_HOST)
-        def boltPortEnv = ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)
-        String boltPort = neo4JContainer.getMappedPort(boltPortEnv)
-        String boltURL = "bolt://$host:$boltPort"
-        def build = Config.builder().withLogging(new JULogging(Level.OFF)).build()
-        GraphDatabase.driver(boltURL, AuthTokens.basic(ApplicationConfiguration.getString(PreferenceType.NEO4J_USER), ApplicationConfiguration.getString(PreferenceType.NEO4J_PASSWORD)), build)
+    static boolean connectionOk() {
+        boolean connectionOk
+        try {
+            executeDbmsComponents()
+            connectionOk = true
+        } catch (Exception ignored) {
+            connectionOk = false
+        }
+        connectionOk
     }
+
+    static String version() {
+        Record record = executeDbmsComponents()
+        record.get("versions").values()[0].asString()
+    }
+
+    static String edition() {
+        Record record = executeDbmsComponents()
+        record.get("edition").asString()
+    }
+
+
+    private static Record executeDbmsComponents() {
+        Driver driver = openDriver()
+        def result = run(driver, "call dbms.components() yield name, versions, edition")
+        def record = result.single()
+        record
+    }
+
 
     static Driver openDriver() {
         def host = ApplicationConfiguration.getString(PreferenceType.NEO4J_HOST)
         def boltPort = ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)
         def username = ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)
         def password = ApplicationConfiguration.getString(PreferenceType.NEO4J_PASSWORD)
-        String boltURL = "bolt://$host:$boltPort"
+        def protocol = ""
+        if (!host.contains(":")) {
+            protocol = "bolt://"
+        }
+        String boltURL = "$protocol$host:$boltPort"
         if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y") {
             log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
         }
