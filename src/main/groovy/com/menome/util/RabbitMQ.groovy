@@ -45,6 +45,10 @@ class RabbitMQ {
         try {
             def rabbitConnection = connectionFactory.newConnection()
             Channel rabbitChannel = rabbitConnection.createChannel()
+            def queue = ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE)
+            def exchange = ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE)
+            rabbitChannel.queueDeclare(queue, true, false, false, null)
+            rabbitChannel.exchangeDeclare(exchange, "topic", true)
             rabbitChannel.queueBind(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE),ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE),"")
         } catch (Exception ignored) {
             ok = Boolean.FALSE
