@@ -264,6 +264,34 @@ These are the environment variables that are used by the message server to confi
 |SHOW_CONNECTION_LOG_OUTPUT |Y                 |
 |HTTP_SERVER_PORT           |8081              |
 
+## Generating Test Messages from a server end point
+It might be helpful to generate a bunch of test messages to evaluate the configuration and to check the server performance. 
+
+The following URL will generate n messages
+
+```http://server:HTTP_SERVER_PORT/GenerateTestMessages/<number of message>```
+ 
+For example:
+
+http://localhost:8081/GenerateTestMessages/50000
+
+Will generate 50,000 test messages
+
+## Deleting Test Messages
+Removing the test messages from the Neo4J server can be done via the follwing endpoint
+
+```http://server:HTTP_SERVER_PORT/DeleteTestMessages```
+ 
+For example:
+
+http://localhost:8081/DeleteTestMessages
+
+Will delete all nodes from Neo4J that have a node with a property of SourceSystem with a value of menome_test_framework 
+
+The code behind this endpoint is the equivalent of executing this cypher statement:
+ 
+```match (n) where n.SourceSystem='menome_test_framework' detach delete n```
+
 
 ### Jenkins Configuration
 There is a Jenkins pipeline defined for the project (See Jenkinsfile in the root of the project)

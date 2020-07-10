@@ -110,7 +110,7 @@ class Neo4J {
     static void deleteAllTestNodes() {
         def driver = openDriver()
         run(driver, "match (n) where n.SourceSystem='menome_test_framework' detach delete n")
-        await().atMost(1, TimeUnit.MINUTES).until { run(driver, "match (n) return count(n) as count").single().get("count").asInt() == 0 }
+        await().atMost(1, TimeUnit.MINUTES).until { run(driver, "match (n) where n.SourceSystem='menome_test_framework' return count(n) as count").single().get("count").asInt() == 0 }
     }
 
 
