@@ -1,11 +1,20 @@
 package com.menome.neo4j
 
+
+import com.menome.MessagingWithTestContainersSpecification
 import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
 import com.menome.util.PreferenceType
-import spock.lang.Specification
+import spock.lang.Shared
 
-class Neo4JSpecification extends Specification {
+class Neo4JSpecification extends MessagingWithTestContainersSpecification {
+
+    @Shared
+    String neo4JHost
+
+    def setupSpec(){
+        neo4JHost = ApplicationConfiguration.getString(PreferenceType.NEO4J_HOST)
+    }
 
     def "connection ok"() {
         given:
@@ -28,7 +37,7 @@ class Neo4JSpecification extends Specification {
     def "url with protocol"() {
         given:
         def originalURL = ApplicationConfiguration.getString(PreferenceType.NEO4J_HOST)
-        System.setProperty(PreferenceType.NEO4J_HOST.toString(), "bolt://localhost")
+        System.setProperty(PreferenceType.NEO4J_HOST.toString(), "bolt://$neo4JHost")
         expect:
         Boolean.TRUE == Neo4J.connectionOk()
         cleanup:
@@ -39,7 +48,7 @@ class Neo4JSpecification extends Specification {
     def "url without protocol"() {
         given:
         def originalURL = ApplicationConfiguration.getString(PreferenceType.NEO4J_HOST)
-        System.setProperty(PreferenceType.NEO4J_HOST.toString(), "localhost")
+        System.setProperty(PreferenceType.NEO4J_HOST.toString(), "$neo4JHost")
         expect:
         Boolean.TRUE == Neo4J.connectionOk()
         cleanup:
