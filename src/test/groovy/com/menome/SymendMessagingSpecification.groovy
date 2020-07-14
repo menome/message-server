@@ -35,7 +35,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
                     .NodeType("CollectionEvent")
                     .Priority(1)
                     .SourceSystem("menome_test_framework")
-                    .ConformedDimensions("ACCTNUM": random.nextInt(5000), "ENT_SEQ_NO": random.nextInt(5000))
+                    .ConformedDimensions("ACCTNUM": random.nextInt(5000), "ENT_SEQ_NO": random.nextInt(5000), "UNIQUE_ID":UUID.randomUUID())
                     .Properties(deriveProperties(primaryNodePropertyCount))
                     .Connections(deriveConnections(connectionCount))
                     .build()
