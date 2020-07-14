@@ -75,7 +75,7 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
         MessageServerCommand.shutdown()
     }
 
-    @IgnoreIf({env.RUN_WITH_TEST_CONTAINERS=='Y'})
+    @IgnoreIf({ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y"})
     def "process 500,000 with two message server instances in less than five minutes"() {
         given:
         def messagesToWrite = 500_000
@@ -94,7 +94,7 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
 
     }
 
-    @IgnoreIf({env.RUN_WITH_TEST_CONTAINERS=='Y'})
+    @IgnoreIf({ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y"})
     def "process 200,000 Symend with two message server instances"() {
         given:
         def messagesToWrite = 200_000
@@ -113,7 +113,7 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
 
     }
 
-    @IgnoreIf({env.RUN_WITH_TEST_CONTAINERS=='Y'})
+    @IgnoreIf({ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y"})
     def "process 100,000 Symend messages in less than five minutes"() {
         given:
         def messagesToWrite = 100_000
