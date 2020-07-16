@@ -2,6 +2,7 @@ package com.menome.util
 
 import org.neo4j.driver.*
 import org.neo4j.driver.internal.logging.JULogging
+import org.neo4j.driver.summary.ResultSummary
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -81,7 +82,7 @@ class Neo4J {
         executeStatementListInSession(statements, session, [:])
     }
 
-    static executeStatementListInSession(List<String> statements, Session session, Map parameters) {
+    static ResultSummary executeStatementListInSession(List<String> statements, Session session, Map parameters) {
         String statement = ""
         statements.each() {
             statement += it + " \n"
@@ -91,20 +92,26 @@ class Neo4J {
         def retries = 0
         def success = false
         def lastException = null
+        ResultSummary resultSummary = null
         while (!success && retries < retryCount) {
+            def transaction = session.beginTransaction()
             try {
-                def transaction = session.beginTransaction()
-                transaction.run(statement, parameters)
+                def result = transaction.run(statement, parameters)
+                resultSummary = result.consume()
                 transaction.commit()
                 success = true
             } catch (Exception exception) {
+                transaction.rollback()
                 retries++
                 lastException = exception
+            } finally {
+                transaction.close()
             }
         }
         if (!success) {
             throw lastException
         }
+        resultSummary
     }
 
     static void deleteAllTestNodes() {
