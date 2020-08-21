@@ -75,7 +75,7 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
         MessageServerCommand.shutdown()
     }
 
-    @IgnoreIf({ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y"})
+    @IgnoreIf({ ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y" })
     def "process 500,000 with two message server instances in less than five minutes"() {
         given:
         def messagesToWrite = 500_000
@@ -94,7 +94,7 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
 
     }
 
-    @IgnoreIf({ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y"})
+    @IgnoreIf({ ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y" })
     def "process 200,000 Symend with two message server instances"() {
         given:
         def messagesToWrite = 200_000
@@ -113,12 +113,13 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
 
     }
 
-    @IgnoreIf({ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y"})
+    @IgnoreIf({ ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y" })
     def "process 100,000 Symend messages in less than five minutes"() {
         given:
         def messagesToWrite = 100_000
         writeSymendMessages(messagesToWrite)
-        when:        MessageServerCommand.main()
+        when:
+        MessageServerCommand.main()
 
         await().atMost(5, TimeUnit.MINUTES).until { Neo4J.run(driver, "match (e:CollectionEvent) return count(e) as count").single().get("count").asInt() == messagesToWrite }
         then:
@@ -126,7 +127,28 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
 
         cleanup:
         MessageServerCommand.shutdown()
+    }
 
+
+    def "process single message that has connection without any additional properties"() {
+        given:
+        def message = '{"Name":"5.2 Goals and Objectives","NodeType":"TopicHeading","SourceSystem":"menome_test_framework","ConformedDimensions":{"Code":"5.2","SourceSystem":"menome_test_framework"},"Properties":{"HeadingText":"Goals and Objectives"},"Connections":[{"NodeType":"TopicHeading","RelType":"SUBSECTION_OF","ForwardRel":true,"ConformedDimensions":{"Code":"5","SourceSystem":"menome_test_framework"}}]}'
+        def rabbitChannel = openRabbitMQChanel(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), rabbitConnectionFactory)
+        when:
+        rabbitChannel.basicPublish(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), null, message.getBytes())
+        MessageServerCommand.main()
+        await().atMost(30, TimeUnit.SECONDS).until { Neo4J.run(driver, "match (t:TopicHeading) return count(t) as count").single().get("count").asInt() == 2 }
+        then:
+        2 == Neo4J.run(driver, "match (t:TopicHeading) return count(t) as count").single().get("count").asInt()
+
+    }
+
+    private static writeODSMessages() {
+        def rabbitChannel = openRabbitMQChanel(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), rabbitConnectionFactory)
+
+        new File("src/test/resources/ods_messages.txt").text.eachLine { String message ->
+            rabbitChannel.basicPublish(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), null, message.getBytes())
+        }
     }
 
 

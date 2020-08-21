@@ -265,10 +265,12 @@ class MessageProcessor {
 
             merge += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
             Map keysToProcess = flattenMessageMap(map, false)
-            merge += ", "
-            def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
-            merge += mergeExpression
-            merge += " ON MATCH SET " + mergeExpression
+            if (keysToProcess) {
+                merge += ", "
+                def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
+                merge += mergeExpression
+                merge += " ON MATCH SET " + mergeExpression
+            }
 
             mergeStatements << merge
         }
