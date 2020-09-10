@@ -1,17 +1,21 @@
 package com.menome.messageBatchProcessor
 
-import com.google.gson.Gson
-import com.menome.messageProcessor.InvalidMessageException
-import com.menome.messageProcessor.MessageProcessor
-import com.menome.messageProcessor.Neo4JStatements
+
+import com.menome.message.Neo4JConnection
+import com.menome.message.Neo4JNode
+import com.menome.messageParser.ConvertJSonToNeo4JObjects
 import com.menome.util.ApplicationConfiguration
 import com.menome.util.Neo4J
 import com.menome.util.PreferenceType
-import com.menome.util.Redis
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.commons.lang3.time.StopWatch
+import org.everit.json.schema.Schema
 import org.everit.json.schema.ValidationException
+import org.everit.json.schema.loader.SchemaLoader
+import org.json.JSONObject
+import org.json.JSONTokener
 import org.neo4j.driver.Driver
+import org.neo4j.driver.Session
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -21,82 +25,151 @@ import java.util.concurrent.TimeUnit
 class MessageBatchProcessor {
 
     static Logger log = LoggerFactory.getLogger(MessageBatchProcessor.class)
+    static def jsonSchema
+    static JSONObject rawSchema
+    static Schema schema
+    static boolean enableValidation = true  //Should only be used for testing purposes
+
+
+    // Load the harvester schema (used to validate incoming JSON messages) from the local dev environment or from the packaged jar at runtime
+    static {
+        jsonSchema = null
+        try {
+            jsonSchema = new File("src/main/resources/harvester_schemax.json").text
+        } catch (Exception ignore) {
+            try {
+                jsonSchema = MessageBatchProcessor.getResourceAsStream("/harvester_schema.json").text
+            } catch (Exception ignored) {
+                log.info("MessageProcessor validation disabled. Schema harvester_schema.json cannot be located. ")
+            }
+        }
+
+        if (jsonSchema != null) {
+            if (ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y") {
+                log.info("MessageProcessor schema validation enabled. harvester_schema.json will be used to validate all incoming messages. ")
+            }
+            rawSchema = new JSONObject(new JSONTokener(jsonSchema))
+            schema = SchemaLoader.load(rawSchema)
+        }
+
+    }
 
     static MessageBatchResult process(List<String> messages, Driver driver, MeterRegistry registry) {
         log.debug(Thread.currentThread().getName() + " " + messages.size())
         StopWatch entireBatchResultTimer = new StopWatch()
         entireBatchResultTimer.start()
 
+        def session = driver.session()
         List<MessageError> errors = []
-
-        StopWatch methodTimer = new StopWatch()
-
-        StopWatchWrapper.start(methodTimer)
-        def messagesByTypeOrErrorsTuple = groupMessagesByNodeType(messages)
-        StopWatchWrapper.stopAndRecord(methodTimer,"MessageBatchProcessor_groupMessageByNodeType_method",registry)
-        Map<String, List<String>> messagesByNodeType = messagesByTypeOrErrorsTuple.first
-        errors.addAll(messagesByTypeOrErrorsTuple.second)
-
-        messagesByNodeType.each { nodeType, msgs ->
-            StopWatchWrapper.start(methodTimer)
-            Neo4JStatements statements = MessageProcessor.process(msgs.get(0))
-            StopWatchWrapper.stopAndRecord(methodTimer,"MessageProcessor_process_method",registry)
-
-            StopWatchWrapper.start(methodTimer)
-            processIndexes(msgs, driver)
-            StopWatchWrapper.stopAndRecord(methodTimer,"MessageBatchProcessor_processIndexes_method",registry)
-
-            StopWatchWrapper.start(methodTimer)
-            errors.addAll(processConnectionMerges(msgs, statements, driver))
-            StopWatchWrapper.stopAndRecord(methodTimer,"MessageBatchProcessor_processConnectionMerges_method",registry)
-
-            StopWatchWrapper.start(methodTimer)
-            errors.addAll(processPrimaryNodeMerges(msgs, statements, driver))
-            StopWatchWrapper.stopAndRecord(methodTimer,"MessageBatchProcessor_processPrimaryNodeMerges_method",registry)
-
+        Tuple2<Map<String, MessageBatchCollection>, List<MessageError>> batches = groupMessagesByNodeType(messages)
+        HashSet<Neo4JConnection> connections = []
+        //Process micro batches each node type
+        batches.first().each { String nodeType, MessageBatchCollection batch ->
+            processIndexes(batch, session)
+            errors.addAll(processNodesMicroBatch(batch, session))
         }
-        entireBatchResultTimer.stop()
 
-        if (log.isDebugEnabled()) {
-            errors.each() { error ->
-                log.debug(error.errorText)
+        //Collect up all the unique connections
+        batches.first.each() { String nodeType, MessageBatchCollection batch ->
+            connections.addAll(batch.connections)
+        }
+
+        //process all the connections
+        Map<String, MessageConnectionCollection> connectionsByNodeType = groupConnectionsByRelationshipType(connections)
+        connectionsByNodeType.each() { String relationshipType, MessageConnectionCollection connectionCollection ->
+            processConnectionMicroBatch(connectionCollection, session)
+        }
+
+
+        session.close()
+        //todo:
+        entireBatchResultTimer.stop()
+        errors.addAll(batches.getSecond())
+        def batchDuration = Duration.ofMillis(entireBatchResultTimer.getTime(TimeUnit.MILLISECONDS))
+        def batchSummary = new MessageBatchSummary(messages.size(), errors.size(), batchDuration)
+        new MessageBatchResult(batchSummary, errors)
+    }
+
+    private static void processIndexes(MessageBatchCollection batch, Session session) {
+        Neo4JNode node = batch.prototypeNode()
+        processIndexes(node, session)
+    }
+
+    private static List<MessageError> processNodesMicroBatch(MessageBatchCollection batch, Session session) {
+        List<MessageError> errors = []
+        Neo4JNode node = batch.prototypeNode()
+        String mergesStatement = node.toCypher()
+        String unwind = "UNWIND \$parms AS param " + mergesStatement
+        try {
+            Neo4J.executeStatementListInSession([unwind], session, batch.nodesAsParameterList())
+        } catch (Exception exception) {
+            if (batch.nodes.size() > 1) {
+                List<MessageBatchCollection> segments = MessageBatchCollection.split(batch)
+                segments.each() { MessageBatchCollection messageBatchCollection ->
+                    errors.addAll(processNodesMicroBatch(messageBatchCollection, session))
+                    return errors
+                }
+            } else {
+                //todo not sure the string value of the node is super useful here. Might need to get back to the original message.
+                errors.add(new MessageError(exception.toString(), batch.nodes[0].toString()))
             }
         }
-        def batchDuration = Duration.ofMillis(entireBatchResultTimer.getTime(TimeUnit.MILLISECONDS))
-
-        def batchSummary = new MessageBatchSummary(messages.size(), errors.size(), batchDuration)
-        if (registry) {
-            registry.timer("MessageBatchProcessor_process_method").record(batchDuration)
-            registry.gauge("MessageBatchProcessor_messages_per_second",batchSummary.rate)
-        }
-
-
-        new MessageBatchResult(batchSummary, errors)
-
+        errors
     }
+
+    private static List<MessageError>  processConnectionMicroBatch(MessageConnectionCollection connectionCollection, Session session) {
+        List<MessageError> errors = []
+        def connection = connectionCollection.prototypeRelationship()
+        String connectionMerge = connection.toCypher()
+        String unwind = "UNWIND \$parms AS param " + connectionMerge
+        try {
+            Neo4J.executeStatementListInSession([unwind], session, connectionCollection.relationshipsAsParameterList())
+        } catch (Exception exception){
+            if (connectionCollection.connections.size() > 1) {
+                List<MessageConnectionCollection> segments = MessageConnectionCollection.split(connectionCollection)
+                segments.each() { MessageConnectionCollection messageConnectionCollection ->
+                    errors.addAll(processConnectionMicroBatch(messageConnectionCollection, session))
+                    return errors
+                }
+            } else {
+                //todo not sure the string value of the connection is super useful here. Might need to get back to the original message.
+                errors.add(new MessageError(exception.toString(), connectionCollection.connections[0].toString()))
+            }
+
+        }
+        errors
+    }
+
 
     static MessageBatchResult process(List<String> messages, Driver driver) {
         process(messages, driver, null)
     }
 
 
-    private static Tuple2<Map<String, List<String>>, List<MessageError>> groupMessagesByNodeType(List<String> messages) {
-        Map<String, List<String>> messagesByNodeType = [:]
+    static void validateMessage(String message) {
+        if (schema != null) {
+            schema.validate(new JSONObject(message))
+        }
+    }
+
+    private static Tuple2<Map<String, MessageBatchCollection>, List<MessageError>> groupMessagesByNodeType(List<String> messages) {
+        Map<String, MessageBatchCollection> messagesByNodeType = [:]
         List<MessageError> errors = []
         messages.each() { String jsonMessage ->
             try {
-                MessageProcessor.validateMessage(jsonMessage)
-                def msg = MessageProcessor.buildMapFromJSONString(jsonMessage)
-                String nodeType = msg.NodeType
-                if (nodeType) {
-                    List<String> messageList = messagesByNodeType.get(nodeType)
-                    if (!messageList) {
-                        messageList = []
+                if (enableValidation) {
+                    validateMessage(jsonMessage)
+                }
+                Tuple2<List<Neo4JNode>, List<Neo4JConnection>> neo4JObjects = ConvertJSonToNeo4JObjects.fromJson(jsonMessage)
+                List<Neo4JNode> nodes = neo4JObjects.getFirst()
+                nodes.each() { Neo4JNode node ->
+                    MessageBatchCollection batchCollection = messagesByNodeType.get(node.nodeType)
+                    if (!batchCollection) {
+                        batchCollection = new MessageBatchCollection(node.nodeType)
+                        messagesByNodeType.put(node.nodeType, batchCollection)
                     }
-                    messageList.add(jsonMessage)
-                    messagesByNodeType.put(nodeType, messageList)
-                } else {
-                    errors.add(new MessageError(new InvalidMessageException("Missing NodeType").toString(), jsonMessage))
+                    batchCollection.addNode(node)
+                    batchCollection.addConnections(neo4JObjects.getSecond())
                 }
             } catch (ValidationException ex) {
                 errors.add(new MessageError(ex.errorMessage, jsonMessage))
@@ -105,168 +178,39 @@ class MessageBatchProcessor {
         return new Tuple2(messagesByNodeType, errors)
     }
 
-    //todo: I'm, throwing away the Neo4J result. Might be some useful information in there for the summary.
-    private static List<MessageError> processPrimaryNodeMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
-        List<Map<String, String>> nodeParameters = []
-        List<MessageError> errors = []
-        messages.each() { String message ->
-            def map = MessageProcessor.processPrimaryNodeParametersAsMap(message)
-            Map<String, Map<String, String>> conformedDimensionsMap = MessageProcessor.processParameterForConnections(message)
-            conformedDimensionsMap.each { dimensionKey, dimensionList ->
-                dimensionList.each { dimension, dimensionParameter ->
-                    map.put((dimensionKey + dimension), dimensionParameter)
-                }
+    static Map<String, MessageConnectionCollection> groupConnectionsByRelationshipType(HashSet<Neo4JConnection> neo4JConnections) {
+        Map<String, MessageConnectionCollection> relationshipMap = [:]
+        neo4JConnections.each() { Neo4JConnection connection ->
+            // The key is a concatenation of three values from the connection to avoid grouping up similar, but not identical connections
+            def key = connection.relationshipName + ":" + connection.source.nodeType + ":" + connection.destination.nodeType
+            MessageConnectionCollection connections = relationshipMap.get(key)
+            if (!connections) {
+                connections = new MessageConnectionCollection(key)
+                relationshipMap.put(key, connections)
             }
-            nodeParameters.addAll(map)
+            connections.addConnection(connection)
         }
-
-        String statement = ""
-        statements.primaryNodeMerge.each() { String statementFragment ->
-            statement += statementFragment + "\n"
-        }
-        String unwind = "UNWIND \$parms AS param " + statement
-        Map parameters = ["parms": nodeParameters]
-
-        if (log.isDebugEnabled()) {
-            log.debug(unwind)
-            log.debug(new Gson().toJson(parameters))
-        }
-
-        try {
-            Neo4J.executeStatementListInSession(List.of(unwind), driver.session(), parameters)
-        } catch (Exception e) {
-            if (messages.size() > 1) {
-                List<String> segments = messages.collate(messages.size().intdiv(2), true)
-                segments.each() { segmentMessages ->
-                    Neo4JStatements segmentStatements = MessageProcessor.process(segmentMessages[0])
-                    errors.addAll(processPrimaryNodeMerges(segmentMessages, segmentStatements, driver))
-                    return errors
-                }
-            } else {
-                errors.add(new MessageError(e.toString(), messages[0]))
-            }
-        }
-        errors
-    }
-
-    private static List<MessageError> processConnectionMerges(List<String> messages, Neo4JStatements statements, Driver driver) {
-
-        List<MessageError> errors = []
-        Map<String, HashSet> uniqueParameters = [:]
-        def connection = Redis.connection()
-
-
-        // Initialize unique map with the set of parameters names from the first message. All messages in the messages parameter are of the same
-        // type so we can assume they will all have the same set of parameters
-        if (messages) {
-            statements.connectionMerge.each() {
-                String key = MessageProcessor.deriveMessageTypeFromStatement(it)
-                uniqueParameters.put(key, new HashSet())
-            }
-        }
-        def useRedisCache = ApplicationConfiguration.getString(PreferenceType.USE_REDIS_CACHE) == "Y"
-        //Iterate over all of the messages getting the parameters for each of the connections. We build up a unique parameters by adding the
-        // parameters to the hashset associated with the parameter type. There is no need to merge the exact same parameters over and over again
-
-        messages.each() { String message ->
-            Map<String, Map<String, String>> parmsFromMessage = MessageProcessor.processParameterForConnections(message)
-            statements.connectionMerge.each() {
-                String key = MessageProcessor.deriveMessageTypeFromStatement(it)
-                Map<String, String> parmsForStatement = parmsFromMessage.get(key)
-                Boolean addStatement = Boolean.TRUE
-
-                if (useRedisCache) {
-                    // Create a second map that also includes the NodeType to avoid the case where two different node types share the exact same parameters
-                    Map<String, String> parmsToHash = new HashMap<>(parmsForStatement)
-                    parmsToHash.put("NodeType", key)
-
-                    String redisKey = key + "." + parmsToHash.hashCode().toString()
-
-                    if (connection.get(redisKey)) {
-                        addStatement = Boolean.FALSE
-                        log.debug("Redis cache hit for parameter hash:{}", redisKey)
-                    } else {
-                        log.debug("Redis cache miss for parameter hash:{}", redisKey)
-                        connection.set(redisKey, "Y")
-                    }
-                }
-                if (addStatement) {
-                    HashSet parmset = uniqueParameters.get(key)
-                    parmset.add(parmsForStatement)
-                    uniqueParameters.put(key, parmset)
-                }
-            }
-        }
-
-        statements.connectionMerge.each() {
-            String key = MessageProcessor.deriveMessageTypeFromStatement(it)
-            List<String> parameters = new ArrayList(uniqueParameters.get(key))
-            String unwind = "UNWIND \$parms AS param " + it
-            Map neo4JParameters = ["parms": parameters]
-            if (log.isDebugEnabled()) {
-                log.debug(unwind)
-                log.debug(new Gson().toJson(neo4JParameters))
-            }
-
-            def neo4JSession = driver.session()
-
-            try {
-                Neo4J.executeStatementListInSession(List.of(unwind), neo4JSession, neo4JParameters)
-            } catch (Exception e) {
-                if (messages.size() > 1) {
-                    List<String> segments = messages.collate(messages.size().intdiv(2), true)
-                    segments.each() { segmentMessages ->
-                        Neo4JStatements segmentStatements = MessageProcessor.process(segmentMessages[0])
-                        errors.addAll(processConnectionMerges(segmentMessages, segmentStatements, driver))
-                        return errors
-                    }
-                } else {
-                    errors.add(new MessageError(e.toString(), messages[0]))
-                }
-            } finally {
-                neo4JSession.close()
-            }
-        }
-
-        if (connection) {
-            connection.close()
-        }
-        errors
+        relationshipMap
     }
 
 
-    private static void processIndexes(List<String> messages, Driver driver) {
+    private static void processIndexes(Neo4JNode node, Session session) {
 
-        Neo4JStatements statements = MessageProcessor.process(messages.get(0))
-        def indexes = statements.indexes
+        List<String> indexes = node.indexes()
 
         //todo: This seems very smelly, but is the easiest way to attempt to create the indexes. There is an apoc method
         // to test if an index exists apoc.schema.node.indexExists("Card", ["Email","EmployeeId"]), but the logic to deconstruct the
         // index to create this statement is more trouble than it's worth. We'll try to create them and let it fail
         indexes.each() { index ->
             try {
-                Neo4J.run(driver, index)
+                Neo4J.run(session, index, [:])
             } catch (Exception e) {
                 //nothing to do here as index already exists.
             }
         }
     }
+
+
 }
 
 
-class StopWatchWrapper{
-
-    static def start(StopWatch methodTimer){
-        methodTimer.start()
-    }
-
-    static def stopAndRecord(StopWatch methodTimer, String timerMessage, MeterRegistry registry){
-        methodTimer.stop()
-        if(registry) {
-            registry.timer(timerMessage).record(Duration.ofMillis(methodTimer.getTime(TimeUnit.MILLISECONDS)))
-        }
-        methodTimer.reset()
-
-    }
-
-}

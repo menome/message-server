@@ -250,7 +250,7 @@ These are the environment variables that are used by the message server to confi
 |RABBITMQ_USER              |menome            |
 |RABBITMQ_PASSWORD          |menome            |
 |RABBITMQ_QUEUE             |test_queue        |
-|RABBITMQ_BATCHSZIE         |5000              |
+|RABBITMQ_BATCH_SIZE        |5000              |
 |RABBITMQ_EXCHANGE          |test_exchange     |
 |                           |                  |
 |NEO4J_HOST                 |localhost         |

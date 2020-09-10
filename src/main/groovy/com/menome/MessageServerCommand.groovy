@@ -76,11 +76,11 @@ class MessageServerCommand implements Runnable {
                 .connectionSupplier({ cf -> cf.newConnection([new Address(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_HOST), ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT))], ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE)) })
 
 
-        log.info("Message Server waiting for messages on queue {} processing messages with a batch size of {}", ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE))
+        log.info("Message Server waiting for messages on queue {} processing messages with a batch size of {}", ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCH_SIZE))
         // This code connects to the Rabbit Server and waits for messages. Messages will be batched up and passed to the Message Processor. The results of the batch are then logged
         RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE))
                 .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
-                .bufferTimeout(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCHSZIE), Duration.ofSeconds(2))
+                .bufferTimeout(ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCH_SIZE), Duration.ofSeconds(2))
                 .map({ messages -> MessageBatchProcessor.process(messages, driver, meterRegistry) })
                 .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
                 .map({ messageBatchResult -> updateServerStats(messageBatchResult) })

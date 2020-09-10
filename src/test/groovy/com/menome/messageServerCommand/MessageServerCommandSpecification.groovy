@@ -76,6 +76,21 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
     }
 
     @IgnoreIf({ ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y" })
+    def "check ODS graph has a specific requirement statement connected to a requirement collection"() {
+        given:
+        writeODSMessages()
+        when:
+        MessageServerCommand.main()
+        await().atMost(60, TimeUnit.SECONDS).until { Neo4J.run(driver, "match (rc:RequirementCollection)-[*1..3]-(rs:RequirementStatement) where rs.Code = '5.3' return count(rs) as count").single().get("count").asInt() == 1 }
+        then:
+        147 == Neo4J.run(driver, "match (n) return count(n) as count").single().get("count").asInt()
+        1 == Neo4J.run(driver, "match (rc:RequirementCollection)-[*1..3]-(rs:RequirementStatement) where rs.Code = '5.3' return count(rs) as count").single().get("count").asInt()
+
+        cleanup:
+        MessageServerCommand.shutdown()
+    }
+
+    @IgnoreIf({ ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "Y" })
     def "process 500,000 with two message server instances in less than five minutes"() {
         given:
         def messagesToWrite = 500_000
@@ -127,28 +142,7 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
 
         cleanup:
         MessageServerCommand.shutdown()
-    }
 
-
-    def "process single message that has connection without any additional properties"() {
-        given:
-        def message = '{"Name":"5.2 Goals and Objectives","NodeType":"TopicHeading","SourceSystem":"menome_test_framework","ConformedDimensions":{"Code":"5.2","SourceSystem":"menome_test_framework"},"Properties":{"HeadingText":"Goals and Objectives"},"Connections":[{"NodeType":"TopicHeading","RelType":"SUBSECTION_OF","ForwardRel":true,"ConformedDimensions":{"Code":"5","SourceSystem":"menome_test_framework"}}]}'
-        def rabbitChannel = openRabbitMQChanel(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), rabbitConnectionFactory)
-        when:
-        rabbitChannel.basicPublish(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), null, message.getBytes())
-        MessageServerCommand.main()
-        await().atMost(30, TimeUnit.SECONDS).until { Neo4J.run(driver, "match (t:TopicHeading) return count(t) as count").single().get("count").asInt() == 2 }
-        then:
-        2 == Neo4J.run(driver, "match (t:TopicHeading) return count(t) as count").single().get("count").asInt()
-
-    }
-
-    private static writeODSMessages() {
-        def rabbitChannel = openRabbitMQChanel(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), rabbitConnectionFactory)
-
-        new File("src/test/resources/ods_messages.txt").text.eachLine { String message ->
-            rabbitChannel.basicPublish(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), null, message.getBytes())
-        }
     }
 
 
@@ -173,6 +167,16 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
             }
         }
         await().atMost(2, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == messagesToWrite }
+    }
+
+    def writeODSMessages() {
+        def rabbitChannel = openRabbitMQChanel(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), rabbitConnectionFactory)
+        int linesProcessed = 0
+        new File("src/test/resources/ods_messages.txt").text.eachLine { String line ->
+            rabbitChannel.basicPublish(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE), ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE), null, line.getBytes())
+            linesProcessed++
+        }
+        await().atMost(2, TimeUnit.MINUTES).until { metrics.publishedMessages.count() == linesProcessed }
 
     }
 

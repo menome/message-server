@@ -37,7 +37,6 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
         1 == Neo4J.run(driver, "match (m:Meeting) return count(m) as count").single().get("count").asInt()
         cleanup:
         driver.close()
-
     }
 
     def "batch of one valid message"() {
@@ -74,7 +73,6 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
         3 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
         cleanup:
         driver.close()
-
     }
 
     def "batch of two valid one corrupted message"() {
@@ -87,8 +85,25 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
         2 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
         cleanup:
         driver.close()
-
     }
+
+    def "batch of three valid one invalid message batch processing catching error"() {
+        given:
+        Driver driver = Neo4J.openDriver()
+        def messages = new ArrayList(threeMessageBatch)
+        messages.add(invalidMessage)
+        MessageBatchProcessor.enableValidation = false
+        def batchResult = MessageBatchProcessor.process(messages, driver)
+        expect:
+        batchResult.errors.size() == 1
+        batchResult.errors[0].errorText.startsWith("org.neo4j.driver.exceptions.ClientException: Invalid input 'n': expected whitespace, comment, COPY, node labels, a property map, ')', MapLiteral or a relationship pattern (line 1, column 39 (offset: 38))")
+        3 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+        cleanup:
+        MessageBatchProcessor.enableValidation = true
+        driver.close()
+    }
+
+
 
 
     def "batch of one invalid message"() {

@@ -72,15 +72,13 @@ class Neo4J {
     }
 
     static Result run(Driver driver, String statement, Map parameters) {
-        Session session = driver.session()
-        def result = session.run(statement, parameters)
-        result
+        run( driver.session(), statement, parameters)
     }
 
-
-    static executeStatementListInSession(List<String> statements, Session session) {
-        executeStatementListInSession(statements, session, [:])
+    static Result run(Session session, String statement, Map parameters){
+        session.run(statement, parameters)
     }
+
 
     static ResultSummary executeStatementListInSession(List<String> statements, Session session, Map parameters) {
         String statement = ""
@@ -101,7 +99,10 @@ class Neo4J {
                 transaction.commit()
                 success = true
             } catch (Exception exception) {
-                transaction.rollback()
+                try {
+                    transaction.rollback()
+                } catch (Exception ignored) {
+                }
                 retries++
                 lastException = exception
             } finally {
