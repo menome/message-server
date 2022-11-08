@@ -65,8 +65,10 @@ dependencies {
     implementation('org.neo4j.driver:neo4j-java-driver:4.1.0')
 
     implementation("org.awaitility:awaitility-groovy:4.0.2")
-    implementation("org.testcontainers:rabbitmq:1.12.3")
-    implementation("org.testcontainers:spock:1.12.3")
+    implementation "org.testcontainers:rabbitmq:1.17.5"
+    implementation "org.testcontainers:spock:1.17.5"
+
+
     implementation("io.projectreactor.rabbitmq:reactor-rabbitmq:1.4.1.RELEASE")
     implementation("io.projectreactor:reactor-test:3.3.5.RELEASE")
 
