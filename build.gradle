@@ -1,7 +1,8 @@
 plugins {
     id "groovy"
-    id "com.github.johnrengelman.shadow" version "5.2.0"
+    id "com.github.johnrengelman.shadow" version "7.1.1"
     id "application"
+    id("io.micronaut.application") version "3.2.1"
 }
 
 version "1.0"
@@ -10,7 +11,6 @@ group "com.menome"
 
 repositories {
     mavenCentral()
-    jcenter()
     maven {
         url = "https://jitpack.io"
     }
@@ -26,17 +26,16 @@ dependencies {
     compileOnly(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion")) {
         exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
     }
-    compileOnly("io.micronaut:micronaut-inject-groovy")
-    compileOnly("info.picocli:picocli-codegen:4.2.0")
+    compileOnly('info.picocli:picocli-codegen:4.7.0')
     implementation(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion")) {
         exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
     }
     implementation("io.micronaut:micronaut-inject")
     implementation("io.micronaut:micronaut-validation")
-    implementation("io.micronaut:micronaut-runtime-groovy")
+    implementation("io.micronaut.groovy:micronaut-runtime-groovy")
     implementation("info.picocli:picocli")
     implementation("io.micronaut.picocli:micronaut-picocli")
-    runtimeOnly("ch.qos.logback:logback-classic:1.2.3")
+    runtimeOnly('ch.qos.logback:logback-classic:1.4.4')
     testImplementation enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion") {
         exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
     }
@@ -47,33 +46,35 @@ dependencies {
     testImplementation("io.micronaut.test:micronaut-test-spock")
     implementation("io.micronaut:micronaut-http-server-netty")
 
-    implementation("com.google.code.gson:gson:2.8.5")
+    implementation('com.google.code.gson:gson:2.10')
 
     implementation("io.micronaut:micronaut-management")
-    implementation("io.micronaut.configuration:micronaut-micrometer-core")
-    implementation 'io.micronaut.micrometer:micronaut-micrometer-registry-prometheus:2.0.0'
+    implementation "io.micronaut.micrometer:micronaut-micrometer-core"
+    implementation "io.micronaut.micrometer:micronaut-micrometer-registry-statsd"
+    implementation "io.micronaut:micronaut-management"
+    implementation 'io.micronaut.micrometer:micronaut-micrometer-registry-prometheus:4.6.1'
 
 
     implementation("io.micronaut.cache:micronaut-cache-core")
 
-    implementation("org.apache.commons:commons-lang3:3.10")
-    implementation("com.rabbitmq:amqp-client:5.7.3'")
+    implementation('org.apache.commons:commons-lang3:3.12.0')
+    implementation('com.rabbitmq:amqp-client:5.16.0')
 
-    implementation("org.neo4j:neo4j:4.0.3") {
+    implementation('org.neo4j:neo4j:5.1.0') {
         exclude group: "org.slf4j", module: "slf4j-nop"
     }
-    implementation('org.neo4j.driver:neo4j-java-driver:4.1.0')
+    implementation('org.neo4j.driver:neo4j-java-driver:5.2.0')
 
-    implementation("org.awaitility:awaitility-groovy:4.0.2")
+    implementation('org.awaitility:awaitility-groovy:4.2.0')
     implementation "org.testcontainers:rabbitmq:1.17.5"
     implementation "org.testcontainers:spock:1.17.5"
 
 
-    implementation("io.projectreactor.rabbitmq:reactor-rabbitmq:1.4.1.RELEASE")
-    implementation("io.projectreactor:reactor-test:3.3.5.RELEASE")
+    implementation('io.projectreactor.rabbitmq:reactor-rabbitmq:1.5.4')
+    implementation('io.projectreactor:reactor-test:3.4.24')
 
     implementation("com.github.everit-org.json-schema:org.everit.json.schema:1.12.1")
-    implementation("redis.clients:jedis:3.3.0")
+    implementation('redis.clients:jedis:4.3.1')
 
 
 
@@ -88,16 +89,24 @@ test.classpath += configurations.developmentOnly
 mainClassName = "com.menome.MessageServerCommand"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
-tasks.withType(GroovyCompile) {
-    groovyOptions.forkOptions.jvmArgs.add('-Dgroovy.parameters=true')
+micronaut {
+    runtime("netty")
+    testRuntime("spock2")
+    processing {
+        incremental(true)
+        annotations("com.menome.*")
+    }
 }
+
+
 
 shadowJar {
     mergeServiceFiles()
+    zip64 true
 }
 
 tasks.withType(JavaExec) {

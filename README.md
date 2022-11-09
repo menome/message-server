@@ -80,24 +80,24 @@ The primary objective of this project is to update the graph as fast as possible
 
 ## Principals
 
-####Immutability 
-Given that each batch will be processed by a thread, I wanted to ensure there was no state kept in the objects. To that end, I opted to adopt some principals from the functional programming world. The first one being immutability. In my processing framework, once an object is created it's not modified. This is done by convention as there aren't too many immutable data structures in Java/Groovy. There are other pure functional languages implemented on the JVM Clojure (Lisp based) and Frege(a Haskel) being two of the more popular functional languages. Scala is another option but it's more of an Object/Functional hybrid. 
+#### Immutability 
+Given that each batch will be processed by a thread, I wanted to ensure there was no state kept in the objects. To that end, I opted to adopt some principals from the functional programming world. The first one being immutability. In my processing framework, once an object is created it's not modified. This is done by convention as there aren't too many immutable data structures in Java/Groovy. There are other pure functional languages implemented on the JVM Clojure (Lisp based) and Frege(a Haskel) being two of the more popular functional languages. Scala is another option, but it's more of an Object/Functional hybrid. 
 
-####Pure Functions
+#### Pure Functions
 Another aspect of a functional approach is ensuring functions don't have side effects. That is given a set of arguments, the function is guaranteed to return the same value and won't impact the 'outside' world. There are no language semantics to express this concept in Java/Groovy so again this is by convention. I opted to implement all behaviour as static functions. This helps enforce statelessness in the objects as static functions can't access instance variables in a class. In the classes I've implemented, there aren't any instance variables so this point is moot, however it's good practice to enforce this at the class level. The system does perform logging at various levels which does violate the no side effect principal, but that's an acceptable exception in my opinion.   
 
-####No Shared Mutable State
+#### No Shared Mutable State
 Given the two principals of immutability and pure functions the goal is not to have any shared state which could be mutated. This is particularly important when we have multiple threads in play. Sharing state that could be mutated in multiple threads is a recipe for disaster. 
 
-####Test Driven
+#### Test Driven
 There are a number of tests that validate the correctness of the implementation. They were developed in concert with the code. In many cases, tests were written before the implementation. Tests are implemented using the Spock BDD framework (http://spockframework.org/) 
 
 
-##Technology
+## Technology
 
-- JVM (Open JDK Version 11.0.4) (https://openjdk.java.net/)
-- Groovy (Version:2.5.x) (https://groovy-lang.org/)
-- Micronaut (Version 2.0.0 M1) (https://micronaut.io/)
+- JVM (Open JDK Version 17.0.X) (https://openjdk.java.net/)
+- Groovy (Version:4.0.6) (https://groovy-lang.org/)
+- Micronaut (Version 3.7.3) (https://micronaut.io/)
 - Project Reactor (https://projectreactor.io/)
 - RabbitMQ (https://www.rabbitmq.com/)
 - Neo4J (https://neo4j.com/)
@@ -143,7 +143,7 @@ When the server starts, it will check to ensure it can connect to both Rabbit MQ
 A couple of things to note
 - The monitoring server starts first. it's the one running at port 8080 above.
 - The rabbit connection is established next. If successful it will display Connected to Rabbit MQ Server OK 
-- The Neo4J connection is established next. If successful it will display Connected to Neo4J Datbase Server Ok with the version and edition of the Neo4J instance.
+- The Neo4J connection is established next. If successful it will display Connected to Neo4J Database Server Ok with the version and edition of the Neo4J instance.
 - Finally, the queue the server is listening on, and the batch size has been configured are displayed.
 
 The server sets up a Reactive stream to listen for messages on the Rabbit queue. 
@@ -193,7 +193,7 @@ The project is built using Gradle (https://gradle.org). All of the external depe
 
 ## How to Build/Run 
 
-Ensure you have a JDK installed (version 11+). I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
+Ensure you have a JDK installed (version 17+). I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
 
 Execute the following from the command line
 
@@ -216,19 +216,6 @@ To start the server and have it listen for Rabbit messages on the queue
 ```shell script
 ./gradlew run
 ```
-
-NOTE:
-You will see the following warning:
-
-```shell script
-WARNING: An illegal reflective access operation has occurred
-WARNING: Illegal reflective access by org.codehaus.groovy.reflection.CachedClass (file:/home/todd/.gradle/caches/modules-2/files-2.1/org.codehaus.groovy/groovy/2.5.10/e02047a2de591492cb19e82c9a72bd9d24b25235/groovy-2.5.10.jar) to method java.lang.Object.finalize()
-WARNING: Please consider reporting this to the maintainers of org.codehaus.groovy.reflection.CachedClass
-WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
-WARNING: All illegal access operations will be denied in a future release
-```
-
-This is due to the requirement to use Groovy 2.x with Micronaut. This warning is coming from the Java 11 JRE and relates to the Groovy compiler reaching across new module boundaries that were introduced in Java 9. It has been resolved in Groovy 3. Unfortunately Micronaut doesn't support Groovy 3 (yet). Once that's resolved the dependencies will be updated and this annoying message will go away.
 
 ## Building a Docker Image
 In the root directory of the project there is a Dockerfile. It can be used to build a docker image to run the server.
@@ -278,7 +265,7 @@ http://localhost:8081/GenerateTestMessages/50000
 Will generate 50,000 test messages
 
 ## Deleting Test Messages
-Removing the test messages from the Neo4J server can be done via the follwing endpoint
+Removing the test messages from the Neo4J server can be done via the following endpoint
 
 ```http://server:HTTP_SERVER_PORT/DeleteTestMessages```
  
