@@ -5,7 +5,7 @@ micronaut:
   application:
     name: messageServer
   metrics:
-    enabled: true
+    enabled: false
     export:
       prometheus:
         enabled: true

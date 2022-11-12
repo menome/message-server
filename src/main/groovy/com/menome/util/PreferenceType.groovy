@@ -1,4 +1,4 @@
-package com.menome.util;
+package com.menome.util
 
 enum PreferenceType {
     RABBITMQ_HOST("localhost"),
@@ -20,12 +20,13 @@ enum PreferenceType {
     RUN_WITH_TEST_CONTAINERS("Y"),
     USE_REDIS_CACHE("Y"),
     SHOW_CONNECTION_LOG_OUTPUT("Y"),
-    HTTP_SERVER_PORT("8081")
+    HTTP_SERVER_PORT("8081"),
+    ENABLE_METRICS("N")
 
 
-    String defaultValue;
+    String defaultValue
 
     PreferenceType(String defaultValue) {
-        this.defaultValue = defaultValue;
+        this.defaultValue = defaultValue
     }
 }

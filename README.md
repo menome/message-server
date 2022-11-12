@@ -230,48 +230,131 @@ docker run -p 8080:8080 -e RABBITMQ_HOST=<RABBITMQ_HOST_IP_ADDRESS> -e NEO4J_HOS
 ## Environment/Configuration Variables
 These are the environment variables that are used by the message server to configure the connections to Rabbit MQ and Neo4J. See the ApplicationConfiguration class for the implementation.
 
-|Environment Variable       | Default Value    |
-|---                        |---               |
-|RABBITMQ_HOST              |localhost         |
-|RABBITMQ_PORT              |5672              |
-|RABBITMQ_USER              |menome            |
-|RABBITMQ_PASSWORD          |menome            |
-|RABBITMQ_QUEUE             |test_queue        |
-|RABBITMQ_BATCH_SIZE        |5000              |
-|RABBITMQ_EXCHANGE          |test_exchange     |
-|                           |                  |
-|NEO4J_HOST                 |localhost         |
-|NEO4J_BOLT_PORT            |7687              |
-|NEO4J_USER                 |neo4j             |
-|NEO4J_PASSWORD             |password          |
-|                           |                  |
-|REDIS_HOST                 |localhost         |
-|REDIS_PORT                 |6379              |
-|                           |                  |
-|SHOW_CONNECTION_LOG_OUTPUT |Y                 |
-|HTTP_SERVER_PORT           |8081              |
+|Environment Variable       | Default Value |
+|---                        |---------------|
+|RABBITMQ_HOST              | localhost     |
+|RABBITMQ_PORT              | 5672          |
+|RABBITMQ_USER              | menome        |
+|RABBITMQ_PASSWORD          | menome        |
+|RABBITMQ_QUEUE             | test_queue    |
+|RABBITMQ_BATCH_SIZE        | 5000          |
+|RABBITMQ_EXCHANGE          | test_exchange |
+|                           |               |
+|NEO4J_HOST                 | localhost     |
+|NEO4J_BOLT_PORT            | 7687          |
+|NEO4J_USER                 | neo4j         |
+|NEO4J_PASSWORD             | password      |
+|                           |               |
+|REDIS_HOST                 | localhost     |
+|REDIS_PORT                 | 6379          |
+|                           |               |
+|SHOW_CONNECTION_LOG_OUTPUT | Y             |
+|HTTP_SERVER_PORT           | 8081          |    
+|                           |               |
+|ENABLE_METRICS             | N             |
+
+## Docker Compose
+There is a docker-compose.yml in the root of the project that can be used to spin up  message server, neo4j and rabbitmq containers. After doing a docker build as illustrated above
+
+```shell script
+docker compose up
+```
+
+This will pull down the required images and start them up, setting up default users, ports etc.
+
+Below is the end of the compose logs. You should see something similar. These two messages indicate that the message server can connect to RabbitMQ and Neo4j
+
+```shell script
+message-server-message-server-1  | 21:57:12.846 [main] INFO  com.menome.MessageServerCommand - Connected to Neo4J Database Server OK - version:4.0.3 edition:community
+message-server-message-server-1  | 21:57:12.847 [main] INFO  com.menome.util.Redis - Connecting to Redis Host:localhost on Port:6379
+```
+
+```shell script
+neo4j                            | 2022-11-11 21:57:04.876+0000 INFO  Starting...
+neo4j                            | 2022-11-11 21:57:12.555+0000 INFO  Called db.clearQueryCaches(): Query cache already empty.
+neo4j                            | 2022-11-11 21:57:12.613+0000 INFO  Bolt enabled on 0.0.0.0:7687.
+neo4j                            | 2022-11-11 21:57:12.613+0000 INFO  Started.
+message-server-message-server-1  | 21:57:12.846 [main] INFO  com.menome.MessageServerCommand - Connected to Neo4J Database Server OK - version:4.0.3 edition:community
+message-server-message-server-1  | 21:57:12.847 [main] INFO  com.menome.util.Redis - Connecting to Redis Host:localhost on Port:6379
+message-server-message-server-1  | 21:57:12.920 [main] INFO  com.menome.MessageServerCommand - Unable to connect to Redis cache. Connection node caching is disabled
+message-server-message-server-1  | 21:57:12.925 [main] INFO  com.menome.MessageServerCommand - Message Server waiting for messages on queue test_queue processing messages with a batch size of 500
+message-server-message-server-1  | 21:57:12.980 [main] INFO  com.menome.MessageServerCommand - Server Started
+rabbitmq                         | 2022-11-11 21:57:12.983739+00:00 [info] <0.666.0> accepting AMQP connection <0.666.0> (172.19.0.2:48494 -> 172.19.0.3:5672)
+rabbitmq                         | 2022-11-11 21:57:12.985168+00:00 [info] <0.666.0> connection <0.666.0> (172.19.0.2:48494 -> 172.19.0.3:5672) has a client-provided name: test_queue
+rabbitmq                         | 2022-11-11 21:57:12.985862+00:00 [info] <0.666.0> connection <0.666.0> (172.19.0.2:48494 -> 172.19.0.3:5672 - test_queue): user 'menome' authenticated and granted access to vhost '/'
+message-server-message-server-1  | 21:57:12.988 [rabbitmq-receiver-connection-subscription-1] INFO  reactor.rabbitmq.Receiver - Consumer amq.ctag-qg04yer_kXEnkxXVIKVVcA consuming from test_queue has been registered
+neo4j                            | 2022-11-11 21:57:13.241+0000 INFO  Remote interface available at http://0.0.0.0:7474/
+message-server-message-server-1  | 21:58:28.201 [default-nioEventLoopGroup-1-2] INFO  com.menome.util.RabbitMQ - Connecting to RabbitMQ server rabbitmq on port 5672 with user menome
+rabbitmq                         | 2022-11-11 21:58:28.203885+00:00 [info] <0.679.0> accepting AMQP connection <0.679.0> (172.19.0.2:33176 -> 172.19.0.3:5672)
+rabbitmq                         | 2022-11-11 21:58:28.206556+00:00 [info] <0.679.0> connection <0.679.0> (172.19.0.2:33176 -> 172.19.0.3:5672): user 'menome' authenticated and granted access to vhost '/'
+```
+
+See the docker-compose.yml file for the specific ports/user ids and passwords used to provision the containers. 
+                 
+
+## Installing docker and docker compose into a new Ubuntu 22.10 instance
+
+The following is provided as an illustration of getting the message server up and running on a brand new installation with just docker and docker compose.
+
+
+```shell script
+  apt-get update
+  apt-get upgrade
+  apt install apt-transport-https ca-certificates curl software-properties-common
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  apt update
+  apt-cache policy docker-ce
+  apt install docker-ce
+  systemctl status docker
+  mkdir -p ~/.docker/cli-plugins/
+  curl -SL https://github.com/docker/compose/releases/download/v2.3.3/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+  chmod +x ~/.docker/cli-plugins/docker-compose
+  docker compose version
+  take message-server
+  touch docker-compose.yml 
+  # open docker-compose.yml in an editor (nano, vim, emacs whatever) and replace contents with docker-compose.yml contents in this repository 
+  
+  docker login
+  # your docker hub login must have access to the menome repository in order to pull the menome/message-server:latest image 
+  
+  docker compose up
+  
+  # Have the message server generate a bunch of test messages.
+  wget http://localhost:8081/GenerateTestMessages/50000
+
+
+```
 
 ## Generating Test Messages from a server end point
 It might be helpful to generate a bunch of test messages to evaluate the configuration and to check the server performance. 
 
 The following URL will generate n messages
 
-```http://server:HTTP_SERVER_PORT/GenerateTestMessages/<number of message>```
+```
+http://server:HTTP_SERVER_PORT/GenerateTestMessages/<number of message>
+```
  
 For example:
 
-http://localhost:8081/GenerateTestMessages/50000
+```
+wget http://localhost:8081/GenerateTestMessages/50000
+```
 
 Will generate 50,000 test messages
 
 ## Deleting Test Messages
 Removing the test messages from the Neo4J server can be done via the following endpoint
 
-```http://server:HTTP_SERVER_PORT/DeleteTestMessages```
+```
+http://server:HTTP_SERVER_PORT/DeleteTestMessages
+```
  
 For example:
 
-http://localhost:8081/DeleteTestMessages
+```
+wget http://localhost:8081/DeleteTestMessages
+```
 
 Will delete all nodes from Neo4J that have a node with a property of SourceSystem with a value of menome_test_framework 
 
@@ -280,33 +363,35 @@ The code behind this endpoint is the equivalent of executing this cypher stateme
 ```match (n) where n.SourceSystem='menome_test_framework' detach delete n```
 
 
-### Jenkins Configuration
-There is a Jenkins pipeline defined for the project (See Jenkinsfile in the root of the project)
-There is some setup required on the Jenkins server for each JDK
+## TODO. Update this section with Java 17 specific instructions. 
 
-(Replace the specific versions below with the version you want to install. This is provided as an example and is already installed on the Jenkins server)
-
-```
-ssh root@jenkins.menome.com
-su jeknins
-cd jdks
-wget wget https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.7%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
-tar -xvf OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
-rm OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
-```
-
-In Jenkins 
-
-- Global Tool Configuration
-- Add JDK
-- Uncheck install automatically
-- Set JAVA_HOME to /var/lib/jenkins/jdks/jdk-11.0.7+10
-
-Update Jenkinsfile with the label defined in the global tool setup
-
-```
-tools {
-    jdk "jdk-11.0.7"
-}
-``` 
-
+> ### Jenkins Configuration
+> There is a Jenkins pipeline defined for the project (See Jenkinsfile in the root of the project)
+> There is some setup required on the Jenkins server for each JDK
+> 
+> (Replace the specific versions below with the version you want to install. This is provided as an example and is already installed on the Jenkins server)
+> 
+> ```
+> ssh root@jenkins.menome.com
+> su jeknins
+> cd jdks
+> wget wget https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.7%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
+> tar -xvf OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
+> rm OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
+> ```
+> 
+> In Jenkins 
+> 
+> - Global Tool Configuration
+> - Add JDK
+> - Uncheck install automatically
+> - Set JAVA_HOME to /var/lib/jenkins/jdks/jdk-11.0.7+10
+> 
+> Update Jenkinsfile with the label defined in the global tool setup
+> 
+> ```
+> tools {
+>     jdk "jdk-11.0.7"
+> }
+> ``` 
+> 

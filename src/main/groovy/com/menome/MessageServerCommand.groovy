@@ -65,7 +65,15 @@ class MessageServerCommand implements Runnable {
 
         System.setProperty("micronaut.server.port", ApplicationConfiguration.getString(PreferenceType.HTTP_SERVER_PORT))
         applicationContext = Micronaut.run(MessageServerCommand.class)
-        MeterRegistry meterRegistry = applicationContext.getBean(MeterRegistry)
+
+        MeterRegistry meterRegistry = null
+        if (ApplicationConfiguration.getString(PreferenceType.ENABLE_METRICS) == "Y"){
+            log.info("Metrics are enabled")
+             meterRegistry = applicationContext.getBean(MeterRegistry)
+        } else  {
+            log.info("Metrics are not enabled")
+        }
+
 
         ConnectionFactory rabbitConnectionFactory = connectToRabbitMQ()
         Driver driver = connectToNeo4J()
@@ -102,7 +110,7 @@ class MessageServerCommand implements Runnable {
         try {
             await().atMost(1, TimeUnit.MINUTES).until { RabbitMQ.connectionOk(rabbitConnectionFactory) }
             log.info("Connected to Rabbit MQ Server OK")
-        } catch (Exception ex){
+        } catch (Exception ignored){
             log.error("Unable to connect to Rabbit MQ Server")
             System.exit(-1)
         }
