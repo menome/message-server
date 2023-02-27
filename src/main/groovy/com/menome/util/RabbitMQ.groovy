@@ -35,7 +35,7 @@ class RabbitMQ {
         Connection rabbitConnection = rabbitConnectionFactory.newConnection()
         Channel rabbitChannel = rabbitConnection.createChannel()
         rabbitChannel.queueDeclare(queue, true, false, false, null)
-        rabbitChannel.exchangeDeclare(exchange, "direct", true)
+        rabbitChannel.exchangeDeclare(exchange, "direct", true) // TODO: make exchange type configurable
         rabbitChannel.queueBind(queue, exchange, routingKey)
         rabbitChannel
     }

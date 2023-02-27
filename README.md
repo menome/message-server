@@ -395,3 +395,7 @@ The code behind this endpoint is the equivalent of executing this cypher stateme
 > }
 > ``` 
 > 
+## NOTE - TODO: Exchange type is currently hardcoded
+
+The RMQ exchange type needs to be changed to be configurable rather than DIRECT only. 
+       rabbitChannel.exchangeDeclare(exchange, "direct", true) // TODO: make exchange type configurable
