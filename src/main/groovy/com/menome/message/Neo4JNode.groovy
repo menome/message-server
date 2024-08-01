@@ -13,16 +13,19 @@ class Neo4JNode {
 
     static Logger log = LoggerFactory.getLogger(Neo4JNode.class)
 
-    def conformedDimensionNeo4JSyntax(String prefix) {
-        String expression = ""
-        conformedDimensions.eachWithIndex { key, value, index ->
-            expression += "$prefix.$key = param.$prefix$key" + (index < conformedDimensions.size() - 1 ? " AND " : "")
-        }
-        expression
-    }
+    def caseStyles = [
+        lower: ["name", "uuid", "theLinkAddedDate", "priority", "sourceSystem"],
+        camel: ["Name", "Uuid", "TheLinkAddedDate", "Priority", "SourceSystem"],
+        upper: ["NAME", "UUID", "THELINKADDEDDATE", "PRIORITY", "SOURCESYSTEM"]
+    ]
 
-    def conformedDimensionNeo4JSyntax() {
-        conformedDimensionNeo4JSyntax("")
+    def caseStyle = PreferenceType.CASE_STYLE
+    def keys = caseStyles.get(caseStyle, ["Name", "Uuid", "TheLinkAddedDate", "Priority", "SourceSystem"])
+
+    def conformedDimensionNeo4JSyntax(String prefix = "") {
+        conformedDimensions.collect { key, value ->
+            "$prefix.$key = param.$prefix$key"
+        }.join(" AND ")
     }
 
     String toCypher() {
@@ -35,7 +38,8 @@ class Neo4JNode {
             cypher += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
         }
 
-        cypher += " ON CREATE SET ${nodeName}.Uuid = apoc.create.uuid(),${nodeName}.TheLinkAddedDate = datetime()"
+        // Set naming pattern based on preference
+        cypher += " ON CREATE SET ${nodeName}.${keys[1]} = apoc.create.uuid(),${nodeName}.${keys[2]} = datetime()"
 
         Map keysToProcess = flattenMessageMap(false)
         if (keysToProcess) {
@@ -48,39 +52,36 @@ class Neo4JNode {
             log.debug(cypher)
         }
         cypher
-
     }
 
     static String buildMergeExpressionFromMap(msgMap, valuePrefix, keySeparator) {
-        String expression = ""
-        msgMap.eachWithIndex { key, value, index ->
-            expression += "$valuePrefix$key$keySeparator param.$key" + (index < msgMap.size() - 1 ? "," : "")
-        }
-        expression
+        msgMap.collect { key, value ->
+            "$valuePrefix$key$keySeparator param.$key"
+        }.join(",")
     }
 
     List<String> indexes() {
-        def indexStatements = []
         def conformedDimensions = this.conformedDimensions
         def keys = (conformedDimensions ?: [:]).keySet().join(",")
         if (keys) {
             def nodeType = this.nodeType
             def nodeIndex = "CREATE INDEX ON :$nodeType($keys)"
-            indexStatements.add(nodeIndex)
+            [nodeIndex]
+        } else {
+            []
         }
-        indexStatements
     }
 
     private HashMap flattenMessageMap(boolean includeConformedDimensions) {
         def flattenedMap = new HashMap()
         if (this.name) {
-            flattenedMap.put("Name", this.name)
+            flattenedMap.put(keys[0], this.name)
         }
         if (this.priority) {
-            flattenedMap.put("Priority", this.priority)
+            flattenedMap.put(keys[3], this.priority)
         }
         if (this.sourceSystem) {
-            flattenedMap.put("SourceSystem", this.sourceSystem)
+            flattenedMap.put(keys[4], this.sourceSystem)
         }
         flattenedMap.putAll(this.properties as Map ?: [:])
         if (includeConformedDimensions) {
@@ -92,7 +93,6 @@ class Neo4JNode {
         flattenedMap.remove("Properties")
         flattenedMap.remove("RelType")
         flattenedMap.remove("ForwardRel")
-
 
         flattenedMap
     }
@@ -119,7 +119,6 @@ class Neo4JNode {
         result = 31 * result + (conformedDimensions != null ? conformedDimensions.hashCode() : 0)
         return result
     }
-
 
     @Override
     public String toString() {

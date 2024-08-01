@@ -21,7 +21,8 @@ enum PreferenceType {
     USE_REDIS_CACHE("Y"),
     SHOW_CONNECTION_LOG_OUTPUT("Y"),
     HTTP_SERVER_PORT("8081"),
-    ENABLE_METRICS("N")
+    ENABLE_METRICS("N"),
+    CASE_STYLE("camel")
 
 
     String defaultValue
