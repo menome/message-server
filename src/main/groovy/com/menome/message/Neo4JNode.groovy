@@ -2,6 +2,7 @@ package com.menome.message
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import com.menome.PreferenceType 
 
 class Neo4JNode {
     String nodeType
