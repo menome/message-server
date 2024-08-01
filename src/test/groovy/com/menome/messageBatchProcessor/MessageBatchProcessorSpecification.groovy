@@ -131,7 +131,6 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
         List<Record> records = result.collect()
         then:
         checkIfIndexExistsInRecordSet(records, ["Employee"], ["Email", "EmployeeId"])
-        checkIfIndexExistsInRecordSet(records, ["Card"], ["Email", "EmployeeId"])
         cleanup:
         driver.close()
 

@@ -28,7 +28,7 @@ class Neo4JNode {
     String toCypher() {
         String msgNodeType = this.nodeType
         String nodeName = msgNodeType.toLowerCase()
-        def cypher = "MERGE (${nodeName}:Card:$msgNodeType "
+        def cypher = "MERGE (${nodeName}:$msgNodeType "
 
         def conformedDimensions = this.conformedDimensions
         if (conformedDimensions) {
@@ -66,9 +66,7 @@ class Neo4JNode {
         if (keys) {
             def nodeType = this.nodeType
             def nodeIndex = "CREATE INDEX ON :$nodeType($keys)"
-            def cardIndex = "CREATE INDEX ON :Card($keys)"
             indexStatements.add(nodeIndex)
-            indexStatements.add(cardIndex)
         }
         indexStatements
     }

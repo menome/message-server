@@ -153,9 +153,7 @@ class MessageProcessor {
         if (msgMap.NodeType && keys) {
             def nodeType = msgMap.NodeType
             def nodeIndex = "CREATE INDEX ON :$nodeType($keys)"
-            def cardIndex = "CREATE INDEX ON :Card($keys)"
             indexStatements.add(nodeIndex)
-            indexStatements.add(cardIndex)
         }
         indexStatements
     }
@@ -198,7 +196,7 @@ class MessageProcessor {
     /**
      *  Given athe message in Map format, generates a Neo4J merge fragment for the primary node.
      *
-     *  eg: MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId})
+     *  eg: MERGE (employee:Employee {Email: param.Email,EmployeeId: param.EmployeeId})
      * ON CREATE SET
      *  employee.Uuid = apoc.create.uuid()
      * ,employee.TheLinkAddedDate = datetime()
@@ -224,7 +222,7 @@ class MessageProcessor {
         def mergeStatements = []
         String msgNodeType = msgMap.NodeType
         String nodeName = msgNodeType.toLowerCase()
-        def cardMerge = "MERGE (${nodeName}:Card:$msgNodeType "
+        def cardMerge = "MERGE (${nodeName}:$msgNodeType "
 
         def conformedDimensions = msgMap.ConformedDimensions
         if (conformedDimensions) {

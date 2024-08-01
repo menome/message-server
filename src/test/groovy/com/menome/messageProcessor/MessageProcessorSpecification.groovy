@@ -79,15 +79,12 @@ class MessageProcessorSpecification extends MessagingSpecification {
 
     def "process indexes from simple message"() {
         given:
-        def expectedCardIndex = "CREATE INDEX ON :Card(Email,EmployeeId)"
         def expectedEmployeeIndex = "CREATE INDEX ON :Employee(Email,EmployeeId)"
         List<String> indexStatements = processIndexesForMessageWithConnections()
 
         expect:
-        indexStatements.size() == 2
-        def actualCardIndex = getStatementFromList(indexStatements, ":Card")
+        indexStatements.size() == 1
         def actualEmployeeIndex = getStatementFromList(indexStatements, ":Employee")
-        actualCardIndex == expectedCardIndex
         actualEmployeeIndex == expectedEmployeeIndex
 
     }
@@ -97,7 +94,7 @@ class MessageProcessorSpecification extends MessagingSpecification {
         List<String> mergeStatements = processPrimaryNodeMergeForMessageWithoutConnections()
         expect:
         mergeStatements.size() == 1
-        mergeStatements[0] == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name"
+        mergeStatements[0] == "MERGE (employee:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name ON MATCH SET employee.SourceSystem= param.SourceSystem,employee.Priority= param.Priority,employee.Name= param.Name"
     }
 
 

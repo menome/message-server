@@ -68,7 +68,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def merge = node.toCypher()
         expect:
         merge
-        merge == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Priority= param.Priority,employee.SourceSystem= param.SourceSystem,employee.Name= param.Name ON MATCH SET employee.Priority= param.Priority,employee.SourceSystem= param.SourceSystem,employee.Name= param.Name"
+        merge == "MERGE (employee:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Priority= param.Priority,employee.SourceSystem= param.SourceSystem,employee.Name= param.Name ON MATCH SET employee.Priority= param.Priority,employee.SourceSystem= param.SourceSystem,employee.Name= param.Name"
 
     }
 
@@ -78,7 +78,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def employeeMerge = employeeNode.toCypher()
         expect:
         employeeMerge
-        employeeMerge == "MERGE (employee:Card:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Status= param.Status,employee.Priority= param.Priority,employee.PreferredName= param.PreferredName,employee.SourceSystem= param.SourceSystem,employee.ResumeSkills= param.ResumeSkills,employee.Name= param.Name ON MATCH SET employee.Status= param.Status,employee.Priority= param.Priority,employee.PreferredName= param.PreferredName,employee.SourceSystem= param.SourceSystem,employee.ResumeSkills= param.ResumeSkills,employee.Name= param.Name"
+        employeeMerge == "MERGE (employee:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Status= param.Status,employee.Priority= param.Priority,employee.PreferredName= param.PreferredName,employee.SourceSystem= param.SourceSystem,employee.ResumeSkills= param.ResumeSkills,employee.Name= param.Name ON MATCH SET employee.Status= param.Status,employee.Priority= param.Priority,employee.PreferredName= param.PreferredName,employee.SourceSystem= param.SourceSystem,employee.ResumeSkills= param.ResumeSkills,employee.Name= param.Name"
     }
 
     def "Merge statement from project connection"() {
@@ -87,7 +87,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def projectMerge = projectNode.toCypher()
         expect:
         projectMerge
-        projectMerge == "MERGE (project:Card:Project {Code: param.Code}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.SourceSystem= param.SourceSystem,project.Name= param.Name ON MATCH SET project.SourceSystem= param.SourceSystem,project.Name= param.Name"
+        projectMerge == "MERGE (project:Project {Code: param.Code}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.SourceSystem= param.SourceSystem,project.Name= param.Name ON MATCH SET project.SourceSystem= param.SourceSystem,project.Name= param.Name"
     }
 
     def "Merge connection statement from employee node"() {
