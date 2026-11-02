@@ -1,0 +1,27 @@
+# Reproducible Neo4j for `./gradlew benchmark` (KANBAN E1-3). Everything that changes throughput is pinned here: image
+# digest, CPU and memory limits, heap and page cache. It is separate from docker-compose.yml so it can run next to the
+# dev stack (Bolt on 7688) and be thrown away: `docker compose -f docker-compose.benchmark.yml down -v`.
+#
+#   docker compose -f docker-compose.benchmark.yml up -d --wait
+#   NEO4J_BOLT_PORT=7688 ./gradlew benchmark --args="--container=neo4j-bench --label=my-change --out=docs/benchmarks"
+#
+# Change a value here and the benchmark report records it; compare reports only when this file (and the hardware) matches.
+services:
+  neo4j-bench:
+    image: neo4j:2026.10.1@sha256:86f8e01402fd0d5fd23e8968375fefdc21284a5c1751fa3fa3de8091a08b6dd6
+    container_name: neo4j-bench
+    cpus: 4
+    mem_limit: 8g
+    ports:
+      - "7688:7687"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-password}
+      NEO4J_db_query_default__language: CYPHER_25
+      # Fixed heap (initial = max, no resizing pauses) and a page cache that holds the benchmark working set
+      NEO4J_server_memory_heap_initial__size: 2g
+      NEO4J_server_memory_heap_max__size: 2g
+      NEO4J_server_memory_pagecache_size: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p $${NEO4J_PASSWORD:-password} 'RETURN 1' || exit 1"]
+      interval: 5s
+      retries: 30

@@ -1,0 +1,87 @@
+# Neo4j Enterprise cluster simulation for evaluating the message server against routing, leader election and
+# failover (KANBAN E5-3, E5-6): 3 primaries (one leader, two followers) hosting the default database `neo4j`.
+# An optional fourth server (profile `reader`) can host a read-only secondary copy.
+#
+# Enterprise is used under Neo4j's evaluation licence (NEO4J_ACCEPT_LICENSE_AGREEMENT=eval). The person running this is
+# accepting those terms; see https://neo4j.com/licensing/ . Do not use this for anything but evaluation.
+#
+#   docker compose -f docker-compose.cluster.yml up -d --wait
+#   NEO4J_HOST=neo4j://localhost NEO4J_BOLT_PORT=7687 <message server or benchmark>      # routing driver, finds the leader
+#   docker exec cluster-server1 cypher-shell -u neo4j -p password "SHOW DATABASES"        # who hosts what, who is online
+#   docker exec cluster-server1 cypher-shell -u neo4j -p password "CALL dbms.cluster.role('neo4j')"   # this server's role
+#   docker compose -f docker-compose.cluster.yml stop server1                              # kill a member (try the leader)
+#   docker compose -f docker-compose.cluster.yml down -v                                   # throw it all away
+#
+# Read replica: `docker compose -f docker-compose.cluster.yml --profile reader up -d --wait`, then
+#   docker exec cluster-server1 cypher-shell -u neo4j -p password -d system \
+#     "ALTER DATABASE neo4j SET TOPOLOGY 3 PRIMARIES 1 SECONDARY"
+#
+# Each server advertises localhost:<its published Bolt port> so a neo4j:// driver on the host gets a routing table it can
+# reach. Container ports are not meant to be used from the host directly except through those published ports.
+x-neo4j: &neo4j
+  image: neo4j:2026.10.1-enterprise
+  cpus: 2
+  mem_limit: 3g
+  environment: &neo4j-env
+    NEO4J_ACCEPT_LICENSE_AGREEMENT: eval
+    NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-password}
+    NEO4J_db_query_default__language: CYPHER_25
+    NEO4J_server_memory_heap_initial__size: 1g
+    NEO4J_server_memory_heap_max__size: 1g
+    NEO4J_server_memory_pagecache_size: 1g
+    # Cluster: members find each other through the discovery endpoints; the default database gets 3 primaries
+    NEO4J_dbms_cluster_discovery_endpoints: server1:6000,server2:6000,server3:6000
+    NEO4J_initial_dbms_default__primaries__count: 3
+    NEO4J_initial_dbms_default__secondaries__count: 0
+    NEO4J_server_cluster_listen__address: 0.0.0.0:6000
+    NEO4J_server_cluster_raft_listen__address: 0.0.0.0:7000
+    NEO4J_server_bolt_listen__address: 0.0.0.0:7687
+  healthcheck:
+    test: ["CMD-SHELL", "cypher-shell -u neo4j -p $${NEO4J_PASSWORD:-password} 'RETURN 1' || exit 1"]
+    interval: 5s
+    retries: 60
+
+services:
+  server1:
+    <<: *neo4j
+    container_name: cluster-server1
+    hostname: server1
+    ports: ["7474:7474", "7687:7687"]
+    environment:
+      <<: *neo4j-env
+      NEO4J_server_cluster_advertised__address: server1:6000
+      NEO4J_server_cluster_raft_advertised__address: server1:7000
+      NEO4J_server_bolt_advertised__address: localhost:7687
+  server2:
+    <<: *neo4j
+    container_name: cluster-server2
+    hostname: server2
+    ports: ["7475:7474", "7688:7687"]
+    environment:
+      <<: *neo4j-env
+      NEO4J_server_cluster_advertised__address: server2:6000
+      NEO4J_server_cluster_raft_advertised__address: server2:7000
+      NEO4J_server_bolt_advertised__address: localhost:7688
+  server3:
+    <<: *neo4j
+    container_name: cluster-server3
+    hostname: server3
+    ports: ["7476:7474", "7689:7687"]
+    environment:
+      <<: *neo4j-env
+      NEO4J_server_cluster_advertised__address: server3:6000
+      NEO4J_server_cluster_raft_advertised__address: server3:7000
+      NEO4J_server_bolt_advertised__address: localhost:7689
+  server4:
+    <<: *neo4j
+    profiles: ["reader"]
+    container_name: cluster-server4
+    hostname: server4
+    ports: ["7477:7474", "7690:7687"]
+    environment:
+      <<: *neo4j-env
+      # Only hosts secondaries: never takes part in a primary's raft group, so it cannot affect write availability
+      NEO4J_initial_server_mode__constraint: SECONDARY
+      NEO4J_server_cluster_advertised__address: server4:6000
+      NEO4J_server_cluster_raft_advertised__address: server4:7000
+      NEO4J_server_bolt_advertised__address: localhost:7690

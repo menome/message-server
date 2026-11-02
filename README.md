@@ -50,23 +50,23 @@ This project reads messages in a specific structure from a RabbitMQ queue and co
   }
 ```
 
-Resulting Cypher statements
+Resulting Cypher statements. Messages are grouped by *signature* (label, dimension keys, property keys) and each group is written with a single `UNWIND $parms AS param` statement. Identifiers are always backtick-quoted.
 
 ```
-CREATE INDEX ON :Employee(Email,EmployeeId)
+CREATE CONSTRAINT IF NOT EXISTS FOR (n:`Employee`) REQUIRE (n.`Email`, n.`EmployeeId`) IS UNIQUE
 
+UNWIND $parms AS param
+MERGE (n:`Employee` {`Email`: param.`Email`, `EmployeeId`: param.`EmployeeId`})
+ON CREATE SET n.`Uuid` = randomUUID(), n.`TheLinkAddedDate` = datetime()
+SET n.`Name` = param.`Name`, n.`PreferredName` = param.`PreferredName`, n.`Priority` = param.`Priority`, ...
 
-MERGE (office0:Office{City: param.City}) ON CREATE SET office0.Uuid = apoc.create.uuid(),office0.TheLinkAddedDate = datetime(), office0.Name= param.Name ON MATCH SET office0.Name= param.Name
-MERGE (project1:Project{Code: param.Code}) ON CREATE SET project1.Uuid = apoc.create.uuid(),project1.TheLinkAddedDate = datetime(), project1.Name= param.Name ON MATCH SET project1.Name= param.Name
-MERGE (team2:Team{Code: param.Code}) ON CREATE SET team2.Uuid = apoc.create.uuid(),team2.TheLinkAddedDate = datetime(), team2.Label= param.Label,team2.Name= param.Name ON MATCH SET team2.Label= param.Label,team2.Name= param.Name
+UNWIND $parms AS param
+MERGE (n:`Office` {`City`: param.`City`}) ON CREATE SET ... SET n.`Name` = param.`Name`   -- likewise Project, Team
 
-MERGE (employee:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Status= param.Status,employee.Priority= param.Priority,employee.PreferredName= param.PreferredName,employee.SourceSystem= param.SourceSystem,employee.ResumeSkills= param.ResumeSkills,employee.Name= param.Name ON MATCH SET employee.Status= param.Status,employee.Priority= param.Priority,employee.PreferredName= param.PreferredName,employee.SourceSystem= param.SourceSystem,employee.ResumeSkills= param.ResumeSkills,employee.Name= param.Name WITH employee,param 
-MATCH (office0:Office {City : param.office0City}) WITH employee,param,office0
-MATCH (project1:Project {Code : param.project1Code}) WITH employee,param,office0,project1
-MATCH (team2:Team {Code : param.team2Code}) WITH employee,param,office0,project1,team2
-MERGE (employee)-[office0_rel:LocatedInOffice]->(office0)
-MERGE (employee)-[project1_rel:WorkedOnProject]->(project1)
-MERGE (employee)-[team2_rel:HAS_FACET]->(team2)
+UNWIND $parms AS param
+MATCH (s:`Employee` {`Email`: param.`s:Email`, `EmployeeId`: param.`s:EmployeeId`})
+MATCH (d:`Office` {`City`: param.`d:City`})
+MERGE (s)-[r:`LocatedInOffice`]->(d)
 ```
 
 Resulting Graph
@@ -75,8 +75,8 @@ Resulting Graph
 
 ## Objectives
 The primary objective of this project is to update the graph as fast as possible. 
-- Messages are streamed off of the Rabbit queue into batches. The batch size defaults to 5,000 but can be configured (see Environment/Configuration Variables below.) 
-- Each batch is processed in its own thread. 
+- Messages are streamed off of the Rabbit queue into batches. The batch size defaults to 500 but can be configured (see Environment/Configuration Variables below.) 
+- Batches are currently processed one at a time on one writer; parallel writers are on the roadmap (`docs/KANBAN.md`, `docs/THROUGHPUT.md`).
 
 ## Principals
 
@@ -95,12 +95,12 @@ There are a number of tests that validate the correctness of the implementation.
 
 ## Technology
 
-- JVM (Open JDK Version 17.0.X) (https://openjdk.java.net/)
-- Groovy (Version:4.0.6) (https://groovy-lang.org/)
-- Micronaut (Version 3.7.3) (https://micronaut.io/)
+- JVM (Java 21) (https://openjdk.java.net/)
+- Groovy (4.0.x, managed by Micronaut) (https://groovy-lang.org/)
+- Micronaut (4.10.x) (https://micronaut.io/)
 - Project Reactor (https://projectreactor.io/)
 - RabbitMQ (https://www.rabbitmq.com/)
-- Neo4J (https://neo4j.com/)
+- Neo4J 5.x / 2026.x (https://neo4j.com/) with Java driver 6.3
 - Docker (https://www.docker.com/)
 
 Testing
@@ -172,15 +172,15 @@ The messages in each sub batch are processed.
 - Parameters for each of the primary nodes are collected into a list. An UNWIND is prepended to the primary node merge and the batch is sent off to Neo4J.
 
 #### Error Handling
-One of the interesting aspects to this approach is what happens if there is an error or multiple errors in the batch? The batch is processed in a single transaction and as such, the entire batch will be rolled back. This is not ideal, we want to identify the messages that failed but let the valid ones proceed. When an error in a batch is detected, the batch is split in two and then each subset of the batch is processed again. This splitting happens until the batch size is one which will contain the invalid message. This approach was inspired by Git bisect.
- 
-### Message Processor
-The message processor converts the JSON formatted messages into Neo4J cypher statements. There are three different types of statements that get created from a single message. 
-- Create indexes for the primary node
-- Merges for the connection node
-- Merge and relationships to the connection nodes from the primary node.
+Messages are acknowledged only after their batch is committed. Each statement group runs in its own managed transaction (the driver retries transient errors). Three kinds of failure are handled differently:
+- **Invalid messages** (schema violations, malformed JSON) are reported individually and the rest of the batch proceeds.
+- **Data errors** from Neo4j (for example a nested object used as a property value) cause the group to be split in half and retried recursively until the offending message is isolated (inspired by git bisect). Splitting never drops elements.
+- **Infrastructure errors** (connection lost, authentication, exhausted transient retries) are not the data's fault: the whole batch is nacked and requeued after a short pause. Every statement is an idempotent MERGE, so reprocessing is safe.
 
-There really isn't anything remarkable about this class. Lots of map processing, string manipulation etc. It is the heart of the approach and gets called for every message that the system consumes. Attempts have been made to make the methods as efficient as they can be. Likely more can be done here however it's not uncommon for a message to be processed in a few milliseconds. The bulk of the time is Neo4J processing the batches.
+Messages that fail are published, with the error text in an `x-error` header, to the durable queue `<RABBITMQ_QUEUE>.errors` (override with `RABBITMQ_ERROR_QUEUE`) and counted as errors.
+
+### Neo4JNode / Neo4JConnection
+These classes own the Cypher for their kind of element. `signature()` decides which elements share a statement, so a batch can mix messages with different property sets or relationship directions without losing anything.
 
 ### Utility Classes
 Neo4J - contains methods for establishing connections to and running cypher statements against the Neo4J database.
@@ -193,7 +193,7 @@ The project is built using Gradle (https://gradle.org). All of the external depe
 
 ## How to Build/Run 
 
-Ensure you have a JDK installed (version 17+). I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
+Ensure you have a JDK installed (version 21+). I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
 
 Execute the following from the command line
 
@@ -237,7 +237,9 @@ These are the environment variables that are used by the message server to confi
 |RABBITMQ_USER              | menome        |
 |RABBITMQ_PASSWORD          | menome        |
 |RABBITMQ_QUEUE             | test_queue    |
-|RABBITMQ_BATCH_SIZE        | 5000          |
+|RABBITMQ_ERROR_QUEUE       | <queue>.errors|
+|RABBITMQ_EXCHANGE_TYPE     | direct        |
+|RABBITMQ_BATCH_SIZE        | 500           |
 |RABBITMQ_EXCHANGE          | test_exchange |
 |                           |               |
 |NEO4J_HOST                 | localhost     |
@@ -245,13 +247,16 @@ These are the environment variables that are used by the message server to confi
 |NEO4J_USER                 | neo4j         |
 |NEO4J_PASSWORD             | password      |
 |                           |               |
-|REDIS_HOST                 | localhost     |
-|REDIS_PORT                 | 6379          |
-|                           |               |
 |SHOW_CONNECTION_LOG_OUTPUT | Y             |
 |HTTP_SERVER_PORT           | 8081          |    
 |                           |               |
 |ENABLE_METRICS             | N             |
+|ENABLE_TEST_ENDPOINTS      | N             |
+|CASE_STYLE                 | camel         | (camel, lower or upper: names of Name, Uuid, TheLinkAddedDate, ...)
+|WRITER_THREADS             | 1             | (threads writing batches to Neo4j at the same time; 1 keeps batches in arrival order; see Upgrade notes)
+|PARSER_THREADS             | 1             | (threads parsing the next batches while the writers write; 1 is enough for 2 writers, use 2 for 4 or more)
+|RELATIONSHIP_TRANSACTIONS  | phase         | (phase: one transaction for all relationship statements of a batch; statement: one per statement, shorter locks on shared nodes, more commits)
+|KEY_CONSTRAINT             | unique        | (unique: uniqueness constraint on a node type's dimension keys; nodekey: NODE KEY, Enterprise only, falls back to unique; index: plain index, no uniqueness guarantee)
 
 ## Docker Compose
 There is a docker-compose.yml in the root of the project that can be used to spin up  message server, neo4j and rabbitmq containers. After doing a docker build as illustrated above
@@ -266,7 +271,6 @@ Below is the end of the compose logs. You should see something similar. These tw
 
 ```shell script
 message-server-message-server-1  | 21:57:12.846 [main] INFO  com.menome.MessageServerCommand - Connected to Neo4J Database Server OK - version:4.0.3 edition:community
-message-server-message-server-1  | 21:57:12.847 [main] INFO  com.menome.util.Redis - Connecting to Redis Host:localhost on Port:6379
 ```
 
 ```shell script
@@ -275,8 +279,6 @@ neo4j                            | 2022-11-11 21:57:12.555+0000 INFO  Called db.
 neo4j                            | 2022-11-11 21:57:12.613+0000 INFO  Bolt enabled on 0.0.0.0:7687.
 neo4j                            | 2022-11-11 21:57:12.613+0000 INFO  Started.
 message-server-message-server-1  | 21:57:12.846 [main] INFO  com.menome.MessageServerCommand - Connected to Neo4J Database Server OK - version:4.0.3 edition:community
-message-server-message-server-1  | 21:57:12.847 [main] INFO  com.menome.util.Redis - Connecting to Redis Host:localhost on Port:6379
-message-server-message-server-1  | 21:57:12.920 [main] INFO  com.menome.MessageServerCommand - Unable to connect to Redis cache. Connection node caching is disabled
 message-server-message-server-1  | 21:57:12.925 [main] INFO  com.menome.MessageServerCommand - Message Server waiting for messages on queue test_queue processing messages with a batch size of 500
 message-server-message-server-1  | 21:57:12.980 [main] INFO  com.menome.MessageServerCommand - Server Started
 rabbitmq                         | 2022-11-11 21:57:12.983739+00:00 [info] <0.666.0> accepting AMQP connection <0.666.0> (172.19.0.2:48494 -> 172.19.0.3:5672)
@@ -321,24 +323,26 @@ The following is provided as an illustration of getting the message server up an
   docker compose up
   
   # Have the message server generate a bunch of test messages.
-  wget http://localhost:8081/GenerateTestMessages/50000
+  curl -X POST http://localhost:8081/GenerateTestMessages/50000
 
 
 ```
 
 ## Generating Test Messages from a server end point
+The test endpoints are disabled unless `ENABLE_TEST_ENDPOINTS=Y` (they return 404 otherwise).
+
 It might be helpful to generate a bunch of test messages to evaluate the configuration and to check the server performance. 
 
 The following URL will generate n messages
 
 ```
-http://server:HTTP_SERVER_PORT/GenerateTestMessages/<number of message>
+POST http://server:HTTP_SERVER_PORT/GenerateTestMessages/<number of messages, 1..1,000,000>
 ```
  
 For example:
 
 ```
-wget http://localhost:8081/GenerateTestMessages/50000
+curl -X POST http://localhost:8081/GenerateTestMessages/50000
 ```
 
 Will generate 50,000 test messages
@@ -347,13 +351,13 @@ Will generate 50,000 test messages
 Removing the test messages from the Neo4J server can be done via the following endpoint
 
 ```
-http://server:HTTP_SERVER_PORT/DeleteTestMessages
+POST http://server:HTTP_SERVER_PORT/DeleteTestMessages
 ```
  
 For example:
 
 ```
-wget http://localhost:8081/DeleteTestMessages
+curl -X POST http://localhost:8081/DeleteTestMessages
 ```
 
 Will delete all nodes from Neo4J that have a node with a property of SourceSystem with a value of menome_test_framework 
@@ -363,39 +367,24 @@ The code behind this endpoint is the equivalent of executing this cypher stateme
 ```match (n) where n.SourceSystem='menome_test_framework' detach delete n```
 
 
-## TODO. Update this section with Java 17 specific instructions. 
+## Upgrade notes
+- All statements are sent as `CYPHER 25`, so they behave the same whatever `db.query.default_language` the database has (set it to `CYPHER_25` anyway; the compose file does).
+- Requires Neo4j 5 or later (uses `CREATE INDEX IF NOT EXISTS`, `randomUUID()`, no APOC). Tested against 2026.10.1.
+- Relationship properties come from `RelProps` / `DateRelProps` on a connection and are additive (`SET r.k = ...`). `Properties` on a connection are properties of the connected node. Previously `Properties` were written to both and replaced all relationship properties.
+- Supported message features: `DateProperties` (ISO-8601 -> `datetime`), `Label` (stored as a property), `DeleteProperties`, `DeleteNode`, and on connections `DeleteRelationship`, `DeleteRelProps`, `DeleteNode`.
+- Whole numbers are stored as integers (previously doubles).
+- Test endpoints are POST and disabled by default. Redis is no longer used.
+- `CASE_STYLE=lower` now means entirely lowercase (`thelinkaddeddate`).
+- A message that sets `Uuid`, `TheLinkAddedDate` (or its own Name/Label/Priority/SourceSystem again) in `Properties`, `DateProperties`, `DeleteProperties` or `ConformedDimensions` is rejected as a bad message (error queue) instead of overwriting the managed property.
+- Only statement/schema errors are treated as bad data. Cluster errors (for example `NotALeader` during a failover) and anything unclassified requeue the batch instead of moving messages to `<queue>.errors`. Use a `neo4j://` host (`NEO4J_HOST=neo4j://...`) against a cluster so writes are routed to the leader.
+- Each node type now gets a **uniqueness constraint** on its dimension keys instead of a plain index (`KEY_CONSTRAINT`). Concurrent writers can no longer create duplicate nodes. On first use of a node type an index from an earlier version is dropped and replaced by the constraint (it brings its own index). If the graph already contains duplicate nodes the constraint cannot be created: the message server logs an ERROR with a query that finds the duplicates, keeps using a plain index, and runs without the guarantee until the duplicates are fixed and it is restarted. The constraint costs a little on every node create (up to about 10% throughput on workloads that mostly create new nodes, see `docs/benchmarks/`). A constraint violation is a bad-data error: the message goes to the error queue. Needs permission to create constraints.
+- The next batch is now parsed while the previous one is being written (a pipeline), which raised throughput by 14-37% in the benchmark with no change in behaviour. `WRITER_THREADS` above 1 writes several batches at once and scaled up to 3.9x on messages that do not share nodes, but **two batches that carry the same node can then commit in either order**, so the node keeps the properties of whichever committed last (with 1 writer the last message wins, as before). Messages that all point at the same few nodes (hubs) gain little from more writers because a relationship write-locks both ends. Statements and rows are sent in one global order (label, then key) so writers do not deadlock each other. RabbitMQ prefetch is now `batch size x (parsers + writers + 1)`.
+- A batch commits in at most 3 write transactions (nodes, relationships, node deletes) instead of one per statement.
 
-> ### Jenkins Configuration
-> There is a Jenkins pipeline defined for the project (See Jenkinsfile in the root of the project)
-> There is some setup required on the Jenkins server for each JDK
-> 
-> (Replace the specific versions below with the version you want to install. This is provided as an example and is already installed on the Jenkins server)
-> 
-> ```
-> ssh root@jenkins.menome.com
-> su jeknins
-> cd jdks
-> wget wget https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.7%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
-> tar -xvf OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
-> rm OpenJDK11U-jdk_x64_linux_hotspot_11.0.7_10.tar.gz
-> ```
-> 
-> In Jenkins 
-> 
-> - Global Tool Configuration
-> - Add JDK
-> - Uncheck install automatically
-> - Set JAVA_HOME to /var/lib/jenkins/jdks/jdk-11.0.7+10
-> 
-> Update Jenkinsfile with the label defined in the global tool setup
-> 
-> ```
-> tools {
->     jdk "jdk-11.0.7"
-> }
-> ``` 
-> 
-## NOTE - TODO: Exchange type is currently hardcoded
+## Documentation
+- `docs/THROUGHPUT.md` - throughput analysis and model; `docs/KANBAN.md` - planned work; `CLAUDE.md` - guide for Claude Code; `RESUME.md` - current state.
 
-The RMQ exchange type needs to be changed to be configurable rather than DIRECT only. 
+## Exchange type
+Set `RABBITMQ_EXCHANGE_TYPE` (default `direct`).
+
        rabbitChannel.exchangeDeclare(exchange, "direct", true) // TODO: make exchange type configurable
