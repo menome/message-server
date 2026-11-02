@@ -7,7 +7,9 @@ enum PreferenceType {
     RABBITMQ_USER("menome"),
     RABBITMQ_PASSWORD("menome"),
     RABBITMQ_QUEUE("test_queue"),
+    RABBITMQ_ERROR_QUEUE(""),  // blank means "<RABBITMQ_QUEUE>.errors"
     RABBITMQ_EXCHANGE("test_exchange"),
+    RABBITMQ_EXCHANGE_TYPE("direct"),
     RABBITMQ_ROUTE("test_route"),
     RABBITMQ_BATCH_SIZE("500"),
     NEO4J_HOST("localhost"),
@@ -15,15 +17,22 @@ enum PreferenceType {
     NEO4J_WEB_PORT("7474"),
     NEO4J_USER("neo4j"),
     NEO4J_PASSWORD("password"),
-    REDIS_HOST("localhost"),
-    REDIS_PORT("6379"),
     RUN_WITH_TEST_CONTAINERS("Y"),
-    USE_REDIS_CACHE("Y"),
     SHOW_CONNECTION_LOG_OUTPUT("Y"),
     HTTP_SERVER_PORT("8081"),
     ENABLE_METRICS("N"),
-    CASE_STYLE("camel")
-
+    ENABLE_TEST_ENDPOINTS("N"),
+    CASE_STYLE("camel"),
+    // unique (default): uniqueness constraint on the dimension keys; nodekey: NODE KEY (Enterprise, falls back to unique);
+    // index: plain range index only (no uniqueness guarantee; for graphs that already contain duplicates)
+    KEY_CONSTRAINT("unique"),
+    // Batches are parsed on PARSER_THREADS threads while WRITER_THREADS threads write earlier ones to Neo4j. One writer keeps
+    // batches in arrival order (the last message for a node wins across batches); several do not.
+    WRITER_THREADS("1"),
+    PARSER_THREADS("1"),
+    // phase: all relationship statements of a batch in one transaction (fewest commits). statement: one transaction per
+    // statement, so a shared node (a hub) is locked only while its own statement runs and writers can work on different hubs at once
+    RELATIONSHIP_TRANSACTIONS("phase")
 
     String defaultValue
 

@@ -43,14 +43,41 @@ class MessageServerCommandSpecification extends SymendMessagingSpecification {
     }
 
 
+    def "messages that cannot be applied are moved to the error queue and the rest are applied"() {
+        given:
+        def exchange = ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE)
+        def route = ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE)
+        def channel = openRabbitMQChanel(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), exchange, route, rabbitConnectionFactory)
+        def errorQueue = ApplicationConfiguration.errorQueue()
+        channel.queueDeclare(errorQueue, true, false, false, null)
+        channel.queuePurge(errorQueue)
+        def errorsBefore = MessageServerCommand.getTotalErrorsProcessedByServer()
+        channel.basicPublish(exchange, route, null, invalidMessage.getBytes())
+        channel.basicPublish(exchange, route, null, victoriaEmployee.getBytes())
+
+        when:
+        MessageServerCommand.main()
+        await().atMost(30, TimeUnit.SECONDS).until { channel.messageCount(errorQueue) == 1 }
+
+        then:
+        1 == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()
+        new String(channel.basicGet(errorQueue, true).body) == invalidMessage
+        MessageServerCommand.getTotalErrorsProcessedByServer() - errorsBefore == 1
+
+        cleanup:
+        MessageServerCommand.shutdown()
+        channel?.connection?.close()
+    }
+
     def "process 5000 employee messages in less than 15 seconds"() {
         given:
         def messagesToWrite = 5_000
+        def processedBefore = MessageServerCommand.getTotalMessagesProcessedByServer()
         writeEmployeeMessages(messagesToWrite)
 
         when:
         MessageServerCommand.main()
-        await().atMost(30, TimeUnit.SECONDS).until { MessageServerCommand.getTotalMessagesProcessedByServer() == messagesToWrite }
+        await().atMost(30, TimeUnit.SECONDS).until { MessageServerCommand.getTotalMessagesProcessedByServer() - processedBefore == messagesToWrite }
 
         then:
         messagesToWrite == Neo4J.run(driver, "match (e:Employee) return count(e) as count").single().get("count").asInt()

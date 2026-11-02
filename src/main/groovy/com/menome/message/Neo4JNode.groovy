@@ -1,135 +1,192 @@
 package com.menome.message
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import groovy.transform.CompileStatic
+import com.menome.util.ApplicationConfiguration
+import com.menome.util.Cypher
 import com.menome.util.PreferenceType
 
+/**
+ * A node to merge (or delete) in the graph. Nodes are merged on their conformed dimensions.
+ *
+ * All nodes that share a {@link #signature()} produce identical Cypher and can therefore be written in one UNWIND batch.
+ *
+ * {@link #signature()}, {@link #identity()} and {@link #dimensionKeys()} are computed on first use and cached (they are
+ * asked for several times per message while batches are grouped). A node is therefore treated as immutable once it has
+ * been grouped: do not change its type, dimensions or property names after calling any of them.
+ */
+@CompileStatic
 class Neo4JNode {
     String nodeType
     String name
+    String label
     Integer priority
     String sourceSystem
-    Map<String, Object> conformedDimensions
-    Map<String, Object> properties
+    Map<String, Object> conformedDimensions = [:]
+    Map<String, Object> properties = [:]
+    Map<String, String> dateProperties = [:]
+    List<String> deleteProperties = []
+    boolean deleteNode = false
+    /** The raw message this node came from, kept so failures can be reported (and dead-lettered) against the original. */
+    String sourceMessage
+    /** Position of the source message in its batch, used to account for failures per message. */
+    int sourceIndex = -1
 
-    static Logger log = LoggerFactory.getLogger(Neo4JNode.class)
+    private List<String> cachedDimensionKeys
+    private List<Object> cachedIdentity
+    private String cachedSignature
 
-    def caseStyles = [
-        lower: ["name", "uuid", "theLinkAddedDate", "priority", "sourceSystem"],
-        camel: ["Name", "Uuid", "TheLinkAddedDate", "Priority", "SourceSystem"],
-        upper: ["NAME", "UUID", "THELINKADDEDDATE", "PRIORITY", "SOURCESYSTEM"]
+    // Property names for the system-managed properties, by CASE_STYLE preference
+    private static final Map<String, Map<String, String>> CASE_STYLES = [
+            lower: [name: "name", label: "label", uuid: "uuid", added: "thelinkaddeddate", priority: "priority", sourceSystem: "sourcesystem"],
+            camel: [name: "Name", label: "Label", uuid: "Uuid", added: "TheLinkAddedDate", priority: "Priority", sourceSystem: "SourceSystem"],
+            upper: [name: "NAME", label: "LABEL", uuid: "UUID", added: "THELINKADDEDDATE", priority: "PRIORITY", sourceSystem: "SOURCESYSTEM"]
     ]
 
-    def caseStyle = PreferenceType.CASE_STYLE
-    def keys = caseStyles.get(caseStyle, ["Name", "Uuid", "TheLinkAddedDate", "Priority", "SourceSystem"])
+    static Map<String, String> keys() {
+        CASE_STYLES.get(ApplicationConfiguration.getString(PreferenceType.CASE_STYLE).toLowerCase(), CASE_STYLES.camel)
+    }
 
-    def conformedDimensionNeo4JSyntax(String prefix = "") {
-        conformedDimensions.collect { key, value ->
-            "$prefix.$key = param.$prefix$key"
-        }.join(" AND ")
+    /**
+     * A message cannot set the properties the message server manages itself through Properties, DateProperties or
+     * DeleteProperties: Uuid and TheLinkAddedDate are generated, and Name, Label, Priority and SourceSystem come from
+     * the message's own fields when it has them (a connected node has no SourceSystem field, so Properties may carry
+     * it). A dimension may legitimately be called Name, but not Uuid or TheLinkAddedDate.
+     *
+     * Runs for every node of every message, so it looks each name up once and allocates nothing on the happy path.
+     *
+     * @throws IllegalArgumentException naming the first reserved property the message tries to set
+     */
+    void assertNoReservedProperties() {
+        Map<String, String> k = keys()
+        rejectReserved("Properties", properties?.keySet(), k, true)
+        rejectReserved("DateProperties", dateProperties?.keySet(), k, true)
+        rejectReserved("DeleteProperties", deleteProperties, k, true)
+        rejectReserved("ConformedDimensions", conformedDimensions?.keySet(), k, false)
+    }
+
+    private void rejectReserved(String source, Collection<String> names, Map<String, String> k, boolean fieldBackedToo) {
+        if (!names) return
+        for (String candidate : names) {
+            boolean reserved = candidate == k.uuid || candidate == k.added ||
+                    (fieldBackedToo && ((name != null && candidate == k.name) || (label != null && candidate == k.label) ||
+                            (priority != null && candidate == k.priority) || (sourceSystem != null && candidate == k.sourceSystem)))
+            if (reserved) {
+                throw new IllegalArgumentException("'${candidate}' is a reserved property name managed by the message server and cannot be set in ${source} (NodeType '${nodeType}')")
+            }
+        }
+    }
+
+    /** Dimension keys in a stable order so the generated Cypher is deterministic. Cached; read-only. */
+    List<String> dimensionKeys() {
+        if (cachedDimensionKeys == null) cachedDimensionKeys = conformedDimensions.keySet().sort(false).asImmutable()
+        cachedDimensionKeys
+    }
+
+    /** Plain (non-date) property values to SET, keyed by graph property name. */
+    Map<String, Object> propertyValues() {
+        Map<String, String> k = keys()
+        Map<String, Object> values = new TreeMap<>()
+        if (name != null) values.put(k.name, name)
+        if (label != null) values.put(k.label, label)
+        if (priority != null) values.put(k.priority, priority)
+        if (sourceSystem != null) values.put(k.sourceSystem, sourceSystem)
+        values.putAll(properties ?: [:])
+        dimensionKeys().each { values.remove(it) }
+        values
+    }
+
+    /** Everything this node binds as a Cypher parameter. */
+    Map<String, Object> parametersAsMap() {
+        Map<String, Object> params = new HashMap<>(propertyValues())
+        params.putAll(dateProperties ?: [:])
+        params.putAll(conformedDimensions)
+        params
+    }
+
+    /** Dimension values in key order. Identifies the node within a batch (last write wins). Cached. */
+    List<Object> identity() {
+        if (cachedIdentity == null) cachedIdentity = dimensionKeys().collect { conformedDimensions[it] }
+        cachedIdentity
+    }
+
+    /**
+     * Nodes with equal signatures can share one Cypher statement. Cached and interned: the same signature is the same
+     * String instance, so grouping lookups hit String's cached hash code and its identity check in equals.
+     */
+    String signature() {
+        if (cachedSignature == null) cachedSignature = computeSignature().intern()
+        cachedSignature
+    }
+
+    private String computeSignature() {
+        [deleteNode ? "delete" : "merge", nodeType, dimensionKeys(), propertyNames(),
+         (dateProperties ?: [:]).keySet().sort(false), (deleteProperties ?: []).sort(false)].join("|")
+    }
+
+    /** The keys of {@link #propertyValues()} without building the values map. */
+    private SortedSet<String> propertyNames() {
+        Map<String, String> k = keys()
+        SortedSet<String> names = new TreeSet<>()
+        if (name != null) names.add(k.name)
+        if (label != null) names.add(k.label)
+        if (priority != null) names.add(k.priority)
+        if (sourceSystem != null) names.add(k.sourceSystem)
+        names.addAll((properties ?: [:]).keySet())
+        names.removeAll(conformedDimensions.keySet())
+        names
     }
 
     String toCypher() {
-        String msgNodeType = this.nodeType
-        String nodeName = msgNodeType.toLowerCase()
-        def cypher = "MERGE (${nodeName}:$msgNodeType "
-
-        def conformedDimensions = this.conformedDimensions
-        if (conformedDimensions) {
-            cypher += "{" + buildMergeExpressionFromMap(conformedDimensions, "", ":") + "})"
-        }
-
-        // Set naming pattern based on preference
-        cypher += " ON CREATE SET ${nodeName}.${keys[1]} = apoc.create.uuid(),${nodeName}.${keys[2]} = datetime()"
-
-        Map keysToProcess = flattenMessageMap(false)
-        if (keysToProcess) {
-            cypher += ", "
-            def mergeExpression = buildMergeExpressionFromMap(keysToProcess, nodeName + ".", "=")
-            cypher += mergeExpression
-            cypher += " ON MATCH SET " + mergeExpression
-        }
-        if (log.isDebugEnabled()) {
-            log.debug(cypher)
-        }
-        cypher
+        deleteNode ? toDeleteCypher() : toMergeCypher()
     }
 
-    static String buildMergeExpressionFromMap(msgMap, valuePrefix, keySeparator) {
-        msgMap.collect { key, value ->
-            "$valuePrefix$key$keySeparator param.$key"
-        }.join(",")
+    String toMergeCypher() {
+        Map<String, String> k = keys()
+        StringBuilder cypher = new StringBuilder("MERGE (n:${Cypher.id(nodeType)} {${dimensionMatch()}})")
+        cypher << " ON CREATE SET n.${Cypher.id(k.uuid)} = randomUUID(), n.${Cypher.id(k.added)} = datetime()"
+        List<String> sets = propertyValues().keySet().collect { String key -> ("n.${Cypher.id(key)} = ${Cypher.param(key)}").toString() }
+        sets.addAll((dateProperties ?: [:]).keySet().sort(false).collect { String key -> ("n.${Cypher.id(key)} = datetime(${Cypher.param(key)})").toString() })
+        if (sets) cypher << " SET " << sets.join(", ")
+        if (deleteProperties) cypher << " REMOVE " << deleteProperties.sort(false).collect { String key -> ("n.${Cypher.id(key)}").toString() }.join(", ")
+        cypher.toString()
     }
 
-    List<String> indexes() {
-        def conformedDimensions = this.conformedDimensions
-        def keys = (conformedDimensions ?: [:]).keySet().join(",")
-        if (keys) {
-            def nodeType = this.nodeType
-            def nodeIndex = "CREATE INDEX ON :$nodeType($keys)"
-            [nodeIndex]
-        } else {
-            []
-        }
+    String toDeleteCypher() {
+        "MATCH (n:${Cypher.id(nodeType)} {${dimensionMatch()}}) DETACH DELETE n"
     }
 
-    private HashMap flattenMessageMap(boolean includeConformedDimensions) {
-        def flattenedMap = new HashMap()
-        if (this.name) {
-            flattenedMap.put(keys[0], this.name)
-        }
-        if (this.priority) {
-            flattenedMap.put(keys[3], this.priority)
-        }
-        if (this.sourceSystem) {
-            flattenedMap.put(keys[4], this.sourceSystem)
-        }
-        flattenedMap.putAll(this.properties as Map ?: [:])
-        if (includeConformedDimensions) {
-            flattenedMap.putAll(this.conformedDimensions as Map ?: [:])
-        }
-        flattenedMap.remove("ConformedDimensions")
-        flattenedMap.remove("Connections")
-        flattenedMap.remove("NodeType")
-        flattenedMap.remove("Properties")
-        flattenedMap.remove("RelType")
-        flattenedMap.remove("ForwardRel")
-
-        flattenedMap
+    private String dimensionMatch() {
+        dimensionKeys().collect { String key -> ("${Cypher.id(key)}: ${Cypher.param(key)}").toString() }.join(", ")
     }
 
-    Map<String, Object> parametersAsMap() {
-        flattenMessageMap(true)
+    /**
+     * Constraint that makes the dimension keys unique (or a node key on Enterprise), so concurrent MERGEs of the same
+     * node cannot create duplicates; its backing index serves the MERGE lookup. Idempotent.
+     */
+    String constraintCypher(boolean nodeKey = false) {
+        "CREATE CONSTRAINT IF NOT EXISTS FOR (n:${Cypher.id(nodeType)}) REQUIRE (${dimensionKeys().collect { String key -> ('n.' + Cypher.id(key)).toString() }.join(', ')}) IS ${nodeKey ? 'NODE KEY' : 'UNIQUE'}".toString()
     }
 
-    boolean equals(o) {
-        if (this.is(o)) return true
-        if (getClass() != o.class) return false
-
-        Neo4JNode node = (Neo4JNode) o
-
-        if (conformedDimensions != node.conformedDimensions) return false
-        if (nodeType != node.nodeType) return false
-
-        return true
-    }
-
-    int hashCode() {
-        int result
-        result = (nodeType != null ? nodeType.hashCode() : 0)
-        result = 31 * result + (conformedDimensions != null ? conformedDimensions.hashCode() : 0)
-        return result
+    /** Plain index that backs the MERGE lookup when no constraint can be used. Idempotent. */
+    String indexCypher() {
+        "CREATE INDEX IF NOT EXISTS FOR (n:${Cypher.id(nodeType)}) ON (${dimensionKeys().collect { 'n.' + Cypher.id(it) }.join(', ')})"
     }
 
     @Override
-    public String toString() {
-        return "Neo4JNode{" +
-                "nodeType='" + nodeType + '\'' +
-                ", name='" + name + '\'' +
-                ", priority=" + priority +
-                ", sourceSystem='" + sourceSystem + '\'' +
-                ", conformedDimensions=" + conformedDimensions +
-                ", properties=" + properties +
-                '}';
+    boolean equals(Object o) {
+        if (this.is(o)) return true
+        if (getClass() != o?.getClass()) return false
+        Neo4JNode node = (Neo4JNode) o
+        nodeType == node.nodeType && conformedDimensions == node.conformedDimensions
+    }
+
+    @Override
+    int hashCode() {
+        31 * (nodeType != null ? nodeType.hashCode() : 0) + (conformedDimensions != null ? conformedDimensions.hashCode() : 0)
+    }
+
+    @Override
+    String toString() {
+        "Neo4JNode{nodeType='$nodeType', name='$name', priority=$priority, sourceSystem='$sourceSystem', conformedDimensions=$conformedDimensions, properties=$properties}"
     }
 }

@@ -11,6 +11,12 @@ class MessageBatchSummary {
     int errorCount
     Duration batchProcessingDuration
     BigDecimal rate
+    StageTimings stages = new StageTimings()
+
+    MessageBatchSummary(int successCount, int errorCount, Duration batchProcessingDuration, StageTimings stages) {
+        this(successCount, errorCount, batchProcessingDuration)
+        this.stages = stages
+    }
 
     MessageBatchSummary(int successCount, int errorCount, Duration batchProcessingDuration) {
         this.successCount = successCount

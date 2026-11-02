@@ -5,9 +5,6 @@ import com.menome.util.Neo4J
 import org.neo4j.driver.Driver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import reactor.core.publisher.Flux
-
-import java.time.Duration
 
 class MessageBatchPerformanceSpecification extends SymendMessagingSpecification {
 
@@ -25,17 +22,13 @@ class MessageBatchPerformanceSpecification extends SymendMessagingSpecification 
 
     private static void processMessageList(List<String> symendMessages) {
         Driver driver = Neo4J.openDriver()
-        Flux<String> flux = Flux.fromIterable(symendMessages)
-        flux.bufferTimeout(BATCH_SIZE, Duration.ofMillis(5))
-                .map({ messages -> MessageBatchProcessor.process(messages, driver) })
-                .map({
-                    result ->
-                        log.info(result.toString())
-                        return result
-                })
-                .subscribe()
-        driver.close()
-
+        try {
+            symendMessages.collate(BATCH_SIZE).each { List<String> messages ->
+                log.info(MessageBatchProcessor.process(messages, driver).toString())
+            }
+        } finally {
+            driver.close()
+        }
     }
 
     def "spectrum test"() {

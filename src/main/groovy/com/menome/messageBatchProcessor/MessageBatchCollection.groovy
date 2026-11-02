@@ -1,64 +1,49 @@
 package com.menome.messageBatchProcessor
 
-import com.menome.message.Neo4JConnection
+import groovy.transform.CompileStatic
 import com.menome.message.Neo4JNode
 
+/**
+ * Nodes of one signature (same label, dimension keys and property keys), so one Cypher statement fits them all.
+ * Within a batch the last message for a given node wins.
+ */
+@CompileStatic
 class MessageBatchCollection {
 
-    String nodeType
-    HashSet<Neo4JNode> nodes = []
-    HashSet<Neo4JConnection> connections = []
+    final String signature
+    final LinkedHashMap<List<Object>, Neo4JNode> nodes = [:]
 
-    MessageBatchCollection(String nodeType) {
-        this.nodeType = nodeType
+    MessageBatchCollection(String signature) {
+        this.signature = signature
+    }
+
+    void addNode(Neo4JNode node) {
+        if (node.signature() != signature) {
+            throw new IllegalArgumentException("Cannot add node ${node} to collection with signature ${signature}")
+        }
+        nodes.put(node.identity(), node)
     }
 
     Neo4JNode prototypeNode() {
-        nodes.first()
+        nodes.values().first()
     }
 
-    def addNode(Neo4JNode node) {
-        if (node.nodeType != nodeType) {
-            throw new RuntimeException("Cannot add node of type ${node.nodeType} ${node.conformedDimensionNeo4JSyntax()} to collection of $nodeType")
-        }
-        nodes.addAll(node)
+    List<Neo4JNode> nodeList() {
+        new ArrayList<>(nodes.values())
     }
 
-    def addConnections(List<Neo4JConnection> neo4JConnections) {
-        if (neo4JConnections) {
-            connections.addAll(neo4JConnections)
-        }
+    static Map<String, List<Map<String, Object>>> asParameterList(List<Neo4JNode> nodes) {
+        ["parms": nodes.collect { Neo4JNode node -> node.parametersAsMap() }]
     }
 
-    def nodesAsParameterList() {
-        List parms = nodes.collect() { Neo4JNode node ->
-            node.parametersAsMap()
-        }
-        ["parms": parms]
-    }
-
-    static List<MessageBatchCollection> split(MessageBatchCollection batch){
-        HashSet<Neo4JNode> nodes = batch.nodes
-        List<Neo4JNode> segments = nodes.collate(nodes.size().intdiv(2), true)
-
-        List<MessageBatchCollection> splitCollection = []
-        MessageBatchCollection part1 = new MessageBatchCollection(batch.nodeType)
-        part1.nodes = segments[0]
-        splitCollection.add(part1)
-
-        MessageBatchCollection part2 = new MessageBatchCollection(batch.nodeType)
-        part2.nodes = segments[1]
-        splitCollection.add(part2)
-
-        splitCollection
+    /** Splits in two without losing elements, whatever the size. */
+    static <T> List<List<T>> split(List<T> items) {
+        int half = items.size().intdiv(2)
+        [items.subList(0, half), items.subList(half, items.size())]
     }
 
     @Override
     String toString() {
-        String output = "NodeType:${nodeType}:${nodes.size()}\n"
-        nodes.each { Neo4JNode node ->
-            output += node.toString() + "\n"
-        }
-        output
+        "Signature:${signature}:${nodes.size()}"
     }
 }

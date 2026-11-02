@@ -3,7 +3,7 @@ pipeline {
     stages {
         stage('Build and Test') {
             tools {
-                jdk "jdk-11.0.7"
+                jdk "jdk-21"
             }
             steps {
                 sh 'java -version'

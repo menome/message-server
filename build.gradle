@@ -1,96 +1,65 @@
 plugins {
     id "groovy"
-    id "com.github.johnrengelman.shadow" version "7.1.1"
+    id "com.gradleup.shadow" version "8.3.10"
     id "application"
-    id("io.micronaut.application") version "3.2.1"
+    id "io.micronaut.application" version "4.6.2"
 }
 
 version "1.0"
 group "com.menome"
 
-
 repositories {
     mavenCentral()
-    maven {
-        url = "https://jitpack.io"
-    }
-
-}
-
-configurations {
-    // for dependencies that are needed for development only
-    developmentOnly
 }
 
 dependencies {
-    compileOnly(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion")) {
-        exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
-    }
-    compileOnly('info.picocli:picocli-codegen:4.7.0')
-    implementation(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion")) {
-        exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
-    }
+    implementation(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
+    compileOnly('info.picocli:picocli-codegen')
+
     implementation("io.micronaut:micronaut-inject")
-    implementation("io.micronaut:micronaut-validation")
-    implementation("io.micronaut.groovy:micronaut-runtime-groovy")
-    implementation("info.picocli:picocli")
-    implementation("io.micronaut.picocli:micronaut-picocli")
-    runtimeOnly('ch.qos.logback:logback-classic:1.4.4')
-    testImplementation enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion") {
-        exclude group: "org.neo4j.driver", module: "neo4j-java-driver"
-    }
-    testImplementation("io.micronaut:micronaut-inject-groovy")
-    testImplementation("org.spockframework:spock-core") {
-        exclude group: "org.codehaus.groovy", module: "groovy-all"
-    }
-    testImplementation("io.micronaut.test:micronaut-test-spock")
     implementation("io.micronaut:micronaut-http-server-netty")
-
-    implementation('com.google.code.gson:gson:2.10')
-
+    implementation("io.micronaut.groovy:micronaut-runtime-groovy")
+    implementation("io.micronaut.picocli:micronaut-picocli")
     implementation("io.micronaut:micronaut-management")
-    implementation "io.micronaut.micrometer:micronaut-micrometer-core"
-    implementation "io.micronaut.micrometer:micronaut-micrometer-registry-statsd"
-    implementation "io.micronaut:micronaut-management"
-    implementation 'io.micronaut.micrometer:micronaut-micrometer-registry-prometheus:4.6.1'
+    implementation("io.micronaut.serde:micronaut-serde-jackson")
+    implementation("io.micronaut.micrometer:micronaut-micrometer-core")
+    implementation("io.micronaut.micrometer:micronaut-micrometer-registry-prometheus")
+    runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("org.yaml:snakeyaml")
 
+    implementation('com.google.code.gson:gson:2.15.0')
+    implementation('org.apache.commons:commons-lang3:3.21.0')
+    implementation('com.rabbitmq:amqp-client:5.37.0')
+    implementation('io.projectreactor.rabbitmq:reactor-rabbitmq:1.5.6')
+    implementation('org.neo4j.driver:neo4j-java-driver:6.3.0')
+    implementation('com.github.erosb:everit-json-schema:1.14.6')
 
-    implementation("io.micronaut.cache:micronaut-cache-core")
-
-    implementation('org.apache.commons:commons-lang3:3.12.0')
-    implementation('com.rabbitmq:amqp-client:5.16.0')
-
-    implementation('org.neo4j:neo4j:5.1.0') {
-        exclude group: "org.slf4j", module: "slf4j-nop"
+    testImplementation(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
+    testImplementation("io.micronaut:micronaut-inject-groovy")
+    testImplementation("io.micronaut.test:micronaut-test-spock")
+    testImplementation("org.spockframework:spock-core:2.4-groovy-4.0") {
+        exclude group: "org.apache.groovy"
     }
-    implementation('org.neo4j.driver:neo4j-java-driver:5.2.0')
-
-    implementation('org.awaitility:awaitility-groovy:4.2.0')
-    implementation "org.testcontainers:rabbitmq:1.17.5"
-    implementation "org.testcontainers:spock:1.17.5"
-
-
-    implementation('io.projectreactor.rabbitmq:reactor-rabbitmq:1.5.4')
-    implementation('io.projectreactor:reactor-test:3.4.24')
-
-    implementation("com.github.everit-org.json-schema:org.everit.json.schema:1.12.1")
-    implementation('redis.clients:jedis:4.3.1')
-
-
-
+    testImplementation('org.awaitility:awaitility-groovy:4.3.0')
+    testImplementation("org.testcontainers:testcontainers:2.0.5")
+    testImplementation("org.testcontainers:testcontainers-rabbitmq:2.0.5")
+    testImplementation("org.testcontainers:testcontainers-neo4j:2.0.5")
+    testImplementation("org.testcontainers:testcontainers-spock:2.0.5")
+    testImplementation('io.projectreactor:reactor-test')
 }
 
-test{
+test {
+    useJUnitPlatform()
     forkEvery = 1
 }
 
-test.classpath += configurations.developmentOnly
-
-mainClassName = "com.menome.MessageServerCommand"
+application {
+    mainClass = "com.menome.MessageServerCommand"
+}
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 micronaut {
@@ -102,17 +71,38 @@ micronaut {
     }
 }
 
-
-
 shadowJar {
     mergeServiceFiles()
     zip64 true
 }
 
-tasks.withType(JavaExec) {
-    classpath += configurations.developmentOnly
-    jvmArgs('-XX:TieredStopAtLevel=1', '-Dcom.sun.management.jmxremote')
+// Throughput benchmark (KANBAN E1-1): own source set so it never ships in the jar, runs against the NEO4J_* env vars
+sourceSets {
+    benchmark {
+        groovy.srcDir 'src/benchmark/groovy'
+        compileClasspath += sourceSets.main.output + configurations.runtimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
 }
 
+dependencies {
+    // Lets the unit specs cover the workload generators without a database
+    testImplementation(sourceSets.benchmark.output)
+}
 
+tasks.register('benchmark', JavaExec) {
+    group = 'verification'
+    description = 'Runs the throughput benchmark; pass options with --args="--profiles=hubs3 --messages=20000"'
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'com.menome.benchmark.BenchmarkRunner'
+    workingDir = projectDir
+    dependsOn classes
+    // A measurement is never "up to date": running it again with the same arguments must run it again
+    outputs.upToDateWhen { false }
+}
 
+// The benchmark needs the full JIT, so it is the one JavaExec task that skips these flags
+tasks.withType(JavaExec).configureEach {
+    if (name == 'benchmark') return
+    jvmArgs('-XX:TieredStopAtLevel=1', '-Dcom.sun.management.jmxremote')
+}

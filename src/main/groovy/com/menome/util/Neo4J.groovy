@@ -1,15 +1,9 @@
 package com.menome.util
 
+import com.menome.message.Neo4JNode
 import org.neo4j.driver.*
-import org.neo4j.driver.internal.logging.JULogging
-import org.neo4j.driver.summary.ResultSummary
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-
-import java.util.concurrent.TimeUnit
-import java.util.logging.Level
-
-import static org.awaitility.Awaitility.await
 
 class Neo4J {
 
@@ -17,109 +11,74 @@ class Neo4J {
     static boolean connectionInformationDisplayed = Boolean.FALSE
 
     static boolean connectionOk() {
-        boolean connectionOk
         try {
-            executeDbmsComponents()
-            connectionOk = true
+            withDriver { Driver driver -> driver.verifyConnectivity() }
+            true
         } catch (Exception ignored) {
-            connectionOk = false
+            false
         }
-        connectionOk
     }
 
     static String version() {
-        Record record = executeDbmsComponents()
-        record.get("versions").values()[0].asString()
+        dbmsComponents().get("versions").values()[0].asString()
     }
 
     static String edition() {
-        Record record = executeDbmsComponents()
-        record.get("edition").asString()
+        dbmsComponents().get("edition").asString()
     }
 
+    private static Record dbmsComponents() {
+        withDriver { Driver driver ->
+            driver.session().withCloseable { Session session ->
+                session.run("CALL dbms.components() YIELD name, versions, edition WHERE name = 'Neo4j Kernel' RETURN versions, edition").single()
+            }
+        } as Record
+    }
 
-    private static Record executeDbmsComponents() {
+    /** Opens a driver, runs the closure and always closes the driver. */
+    static <T> T withDriver(Closure<T> work) {
         Driver driver = openDriver()
-        def result = run(driver, "call dbms.components() yield name, versions, edition")
-        def record = result.single()
-        record
+        try {
+            work(driver)
+        } finally {
+            driver.close()
+        }
     }
 
-
+    /** The caller owns the returned driver and must close it. A driver is a connection pool: share one per process. */
     static Driver openDriver() {
         def host = ApplicationConfiguration.getString(PreferenceType.NEO4J_HOST)
         def boltPort = ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)
         def username = ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)
         def password = ApplicationConfiguration.getString(PreferenceType.NEO4J_PASSWORD)
-        def protocol = ""
-        if (!host.contains(":")) {
-            protocol = "bolt://"
-        }
-        String boltURL = "$protocol$host:$boltPort"
+        // A host that already carries a scheme (neo4j+s://...) is used as is
+        String boltURL = host.contains("://") ? "$host:$boltPort" : "bolt://$host:$boltPort"
         // Only display the log message once per "session"
         if ((ApplicationConfiguration.getString(PreferenceType.SHOW_CONNECTION_LOG_OUTPUT) == "Y") && !connectionInformationDisplayed) {
             log.info("Connecting to Neo4J server {} with user {}", boltURL, username)
             connectionInformationDisplayed = true
         }
-        Config config = Config.builder().withLogging(new JULogging(Level.WARNING)).build()
-
-        GraphDatabase.driver(boltURL, AuthTokens.basic(username, password), config)
+        GraphDatabase.driver(boltURL, AuthTokens.basic(username, password))
     }
-
 
     static Result run(Driver driver, String statement) {
         run(driver, statement, [:])
     }
 
     static Result run(Driver driver, String statement, Map parameters) {
-        run( driver.session(), statement, parameters)
+        run(driver.session(), statement, parameters)
     }
 
-    static Result run(Session session, String statement, Map parameters){
+    static Result run(Session session, String statement, Map parameters) {
         session.run(statement, parameters)
     }
 
-
-    static ResultSummary executeStatementListInSession(List<String> statements, Session session, Map parameters) {
-        String statement = ""
-        statements.each() {
-            statement += it + " \n"
-        }
-
-        def retryCount = 2
-        def retries = 0
-        def success = false
-        def lastException = null
-        ResultSummary resultSummary = null
-        while (!success && retries < retryCount) {
-            def transaction = session.beginTransaction()
-            try {
-                def result = transaction.run(statement, parameters)
-                resultSummary = result.consume()
-                transaction.commit()
-                success = true
-            } catch (Exception exception) {
-                try {
-                    transaction.rollback()
-                } catch (Exception ignored) {
-                }
-                retries++
-                lastException = exception
-            } finally {
-                transaction.close()
+    static void deleteAllTestNodes() {
+        withDriver { Driver driver ->
+            driver.session().withCloseable { Session session ->
+                String property = Cypher.id(Neo4JNode.keys().sourceSystem)
+                session.run(Cypher.versioned("MATCH (n) WHERE n.${property} = 'menome_test_framework' CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS")).consume()
             }
         }
-        if (!success) {
-            throw lastException
-        }
-        resultSummary
     }
-
-    static void deleteAllTestNodes() {
-        def driver = openDriver()
-        run(driver, "match (n) where n.SourceSystem='menome_test_framework' detach delete n")
-        await().atMost(1, TimeUnit.MINUTES).until { run(driver, "match (n) where n.SourceSystem='menome_test_framework' return count(n) as count").single().get("count").asInt() == 0 }
-    }
-
-
 }

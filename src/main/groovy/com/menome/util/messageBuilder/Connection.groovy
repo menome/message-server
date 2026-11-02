@@ -19,4 +19,18 @@ class Connection {
     Map ConformedDimensions
     @SerializedName("Properties")
     Map Properties
+    @SerializedName("DateProperties")
+    Map DateProperties
+    @SerializedName("DeleteProperties")
+    List<String> DeleteProperties
+    @SerializedName("RelProps")
+    Map RelProps
+    @SerializedName("DateRelProps")
+    Map DateRelProps
+    @SerializedName("DeleteRelProps")
+    List<String> DeleteRelProps
+    @SerializedName("DeleteRelationship")
+    Boolean DeleteRelationship
+    @SerializedName("DeleteNode")
+    Boolean DeleteNode
 }

@@ -11,3 +11,5 @@ out/
 .project
 .settings
 .classpath
+.claude/settings.local.json
+build/reports/

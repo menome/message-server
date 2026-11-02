@@ -20,6 +20,14 @@ class MessageBuilder {
     Map ConformedDimensions
     @SerializedName("Properties")
     Map Properties
+    @SerializedName("DateProperties")
+    Map DateProperties
+    @SerializedName("DeleteProperties")
+    List<String> DeleteProperties
+    @SerializedName("DeleteNode")
+    Boolean DeleteNode
+    @SerializedName("Label")
+    String Label
     @SerializedName("Connections")
     List<Connection> Connections = []
 

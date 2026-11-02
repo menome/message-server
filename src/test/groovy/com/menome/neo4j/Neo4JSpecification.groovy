@@ -69,7 +69,7 @@ class Neo4JSpecification extends MessagingWithTestContainersSpecification {
         def version = Neo4J.version()
         expect:
         version
-        version.startsWith("4")
+        version.startsWith("2026")
     }
 
 }

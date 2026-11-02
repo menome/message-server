@@ -15,13 +15,12 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
     static GenericContainer rabbitMQContainer
     static GenericContainer neo4JContainer
-    static GenericContainer redisContainer
 
     def setupSpec() {
         // Start the containers if they need to be and haven't been started yet.
         if (ApplicationConfiguration.getString(PreferenceType.RUN_WITH_TEST_CONTAINERS) == "N") {
             // Nothing to do here. We're assuming the containers are running outside the test or we're testing against external services that are configured with the environment variables.
-        } else if (!rabbitMQContainer || !neo4JContainer || !redisContainer) {
+        } else if (!rabbitMQContainer || !neo4JContainer) {
             startTestContainers()
         }
     }
@@ -48,13 +47,12 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
 
 
         log.info("Starting Neo4J Container")
-        neo4JContainer = new GenericContainer("neo4j:4.0.3")
+        neo4JContainer = new GenericContainer("neo4j:2026.10.1")
                 .withNetwork(network)
                 .withNetworkAliases("neo4j")
                 .withExposedPorts(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_WEB_PORT),ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT))
                 .withEnv("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes")
                 .withEnv("NEO4J_AUTH", "${ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)}/${ApplicationConfiguration.getString(PreferenceType.NEO4J_PASSWORD)}")
-                .withEnv("NEO4JLABS_PLUGINS", "[\"apoc\"]")
                 .withStartupTimeout(Duration.ofMinutes(5))
 
         neo4JContainer.start()
@@ -63,19 +61,6 @@ abstract class MessagingWithTestContainersSpecification extends MessagingSpecifi
         log.info "Neo4J Docker Container - Web http://localhost:${neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_WEB_PORT))}"
 
         System.setProperty(PreferenceType.NEO4J_BOLT_PORT.name(), neo4JContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)).toString())
-
-
-        log.info("Starting Redis Container")
-        redisContainer = new GenericContainer("redis")
-                .withNetwork(network)
-                .withNetworkAliases("redis")
-                .withExposedPorts(ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT))
-
-        redisContainer.start()
-        log.info "Redis Docker container running at  - http://localhost:${redisContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT))}"
-
-        System.setProperty(PreferenceType.REDIS_PORT.name(), redisContainer.getMappedPort(ApplicationConfiguration.getInteger(PreferenceType.REDIS_PORT)).toString())
-
 
     }
 }

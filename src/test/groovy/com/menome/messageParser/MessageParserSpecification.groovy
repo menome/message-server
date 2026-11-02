@@ -68,7 +68,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def merge = node.toCypher()
         expect:
         merge
-        merge == "MERGE (employee:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Priority= param.Priority,employee.SourceSystem= param.SourceSystem,employee.Name= param.Name ON MATCH SET employee.Priority= param.Priority,employee.SourceSystem= param.SourceSystem,employee.Name= param.Name"
+        merge == "MERGE (n:`Employee` {`Email`: param.`Email`, `EmployeeId`: param.`EmployeeId`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`TheLinkAddedDate` = datetime() SET n.`Name` = param.`Name`, n.`Priority` = param.`Priority`, n.`SourceSystem` = param.`SourceSystem`"
 
     }
 
@@ -78,7 +78,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def employeeMerge = employeeNode.toCypher()
         expect:
         employeeMerge
-        employeeMerge == "MERGE (employee:Employee {Email: param.Email,EmployeeId: param.EmployeeId}) ON CREATE SET employee.Uuid = apoc.create.uuid(),employee.TheLinkAddedDate = datetime(), employee.Status= param.Status,employee.Priority= param.Priority,employee.PreferredName= param.PreferredName,employee.SourceSystem= param.SourceSystem,employee.ResumeSkills= param.ResumeSkills,employee.Name= param.Name ON MATCH SET employee.Status= param.Status,employee.Priority= param.Priority,employee.PreferredName= param.PreferredName,employee.SourceSystem= param.SourceSystem,employee.ResumeSkills= param.ResumeSkills,employee.Name= param.Name"
+        employeeMerge == "MERGE (n:`Employee` {`Email`: param.`Email`, `EmployeeId`: param.`EmployeeId`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`TheLinkAddedDate` = datetime() SET n.`Name` = param.`Name`, n.`PreferredName` = param.`PreferredName`, n.`Priority` = param.`Priority`, n.`ResumeSkills` = param.`ResumeSkills`, n.`SourceSystem` = param.`SourceSystem`, n.`Status` = param.`Status`"
     }
 
     def "Merge statement from project connection"() {
@@ -87,7 +87,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def projectMerge = projectNode.toCypher()
         expect:
         projectMerge
-        projectMerge == "MERGE (project:Project {Code: param.Code}) ON CREATE SET project.Uuid = apoc.create.uuid(),project.TheLinkAddedDate = datetime(), project.SourceSystem= param.SourceSystem,project.Name= param.Name ON MATCH SET project.SourceSystem= param.SourceSystem,project.Name= param.Name"
+        projectMerge == "MERGE (n:`Project` {`Code`: param.`Code`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`TheLinkAddedDate` = datetime() SET n.`Name` = param.`Name`, n.`SourceSystem` = param.`SourceSystem`"
     }
 
     def "Merge connection statement from employee node"() {
@@ -95,7 +95,7 @@ class MessageParserSpecification extends MessagingSpecification {
         Neo4JConnection connection = ConvertJSonToNeo4JObjects.fromJson(calgaryEmployee).getSecond().find { Neo4JConnection connection -> connection.relationshipName == "LocatedInOffice" }
         def connectionMerge = connection.toCypher()
         expect:
-        connectionMerge == "MATCH (source:Employee),(destination:Office) WHERE source.Email = param.sourceEmail AND source.EmployeeId = param.sourceEmployeeId AND destination.City = param.destinationCity MERGE (source)-[r:LocatedInOffice]->(destination) SET r = param.Properties"
+        connectionMerge == "MATCH (s:`Employee` {`Email`: param.`s:Email`, `EmployeeId`: param.`s:EmployeeId`}) MATCH (d:`Office` {`City`: param.`d:City`}) MERGE (s)-[r:`LocatedInOffice`]->(d)"
     }
 
     def "Merge connection statement with reverse relationship from employee node"() {
@@ -104,7 +104,7 @@ class MessageParserSpecification extends MessagingSpecification {
         connection.forwardRelationship = false
         def connectionMerge = connection.toCypher()
         expect:
-        connectionMerge == "MATCH (source:Employee),(destination:Office) WHERE source.Email = param.sourceEmail AND source.EmployeeId = param.sourceEmployeeId AND destination.City = param.destinationCity MERGE (source)<-[r:LocatedInOffice]-(destination) SET r = param.Properties"
+        connectionMerge == "MATCH (s:`Employee` {`Email`: param.`s:Email`, `EmployeeId`: param.`s:EmployeeId`}) MATCH (d:`Office` {`City`: param.`d:City`}) MERGE (s)<-[r:`LocatedInOffice`]-(d)"
     }
 
     def "Merge connection with same node type avoiding parameter collision"() {
@@ -118,6 +118,6 @@ class MessageParserSpecification extends MessagingSpecification {
         connection.forwardRelationship = true
         String connectionMerge = connection.toCypher()
         expect:
-        connectionMerge == "MATCH (source:Employee),(destination:Employee) WHERE source.Email = param.sourceEmail AND source.EmployeeId = param.sourceEmployeeId AND destination.Email = param.destinationEmail AND destination.EmployeeId = param.destinationEmployeeId MERGE (source)-[r:Works With]->(destination) SET r = param.Properties"
+        connectionMerge == "MATCH (s:`Employee` {`Email`: param.`s:Email`, `EmployeeId`: param.`s:EmployeeId`}) MATCH (d:`Employee` {`Email`: param.`d:Email`, `EmployeeId`: param.`d:EmployeeId`}) MERGE (s)-[r:`Works With`]->(d)"
     }
 }
