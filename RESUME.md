@@ -1,75 +1,124 @@
 # RESUME - where this project stands
 
-Last updated: 2026-11-01 (end of the throughput session). Read this first when picking the work back up.
+Last updated: 2026-11-02 (end of day: platform upgrade done, E10-1 in progress). Read this first when picking the work back up.
 
-## State in one paragraph
-The message server (RabbitMQ -> Neo4j, Groovy 4 / Micronaut 4, Java 21) is correct, tested and now much faster. The
-code-review fixes, the dependency upgrade and eight throughput stories are done. Suite: **186 tests, 0 failures, 4 skipped**
-(the skipped ones need external infrastructure). Nothing is running (no containers), and **nothing is committed since
-`941d7e8`: 63 files are changed or new in the working tree.** Planned work is in `docs/KANBAN.md` (29 done, 46 in Backlog,
-one P0 left: E3-7, partly done). Measured results are in `docs/benchmarks/README.md`; the guide for working in the code is
-`CLAUDE.md`.
+## The goal
+Take the original Menome data atomization pattern (harvesters emit atomised JSON messages; the refinery, this message
+server, merges them into a knowledge graph, continuously) to current code and methods, then optimise ingestion to the limit,
+ideally beyond anything else available. Three pillars, scored below. Planned work: `docs/KANBAN.md` (32 done, 53 in Backlog, E10-1 in progress).
 
-## What was done on 2026-11-01 (all measured on the pinned Community container, 150k messages)
-| Profile | Baseline | Now, 1 writer | Now, 4 writers |
+## Scorecard (honest)
+| Pillar | Status | Evidence | What is missing |
 |---|---|---|---|
-| hubs3 (the sample message) | 10,979 msg/s | 20,299 | 30,003 |
-| unique-dest | 8,203 | 12,709 | 33,856 |
-| node-only | 34,469 | 52,019 | 118,413 |
-| hub-fanout | 20,682 | 29,441 | 40,363 |
-| wide (41 properties) | 5,244 | 7,567 | 8,572 |
+| **1. Current code and platform** | Done (2026-11-02) | Java 25, Gradle 9.8.2, Micronaut 5.2.4, Groovy 5.0.8, Neo4j driver 6.3.0, Neo4j 2026.10.1, Cypher 25 pinned on every statement, Testcontainers 2.0.5; every library is the newest release as of 2026-11-02 (`docs/DEPENDENCIES.md`); Card pattern, Redis and the embedded Neo4j removed; no APOC | Groovy 6 / Spock 2.5 are out but the Micronaut 5.2.4 BOM is on Groovy 5.0.8, so deferred on purpose; no Dependabot/Renovate; stale `lib/*.jar` and Kubernetes manifest (E8-4); default credentials (E8-5) |
+| **2. Current methods and correctness** | Done for the write path, open around it | Idempotent batched MERGE, at-least-once with manual acks, failure allow-list (a failover requeues, never dead-letters), uniqueness or node-key constraints, reserved-property protection, stage metrics, benchmark harness, 206 tests green, **validated on a real 3-node Enterprise cluster** incl. quorum loss with the real server | CI with a regression gate (E8-2), health reflects consumer liveness (E8-3), graceful drain on SIGTERM (E4-5), dead-letter replay (E6-4), harvester-side modernisation / mapping layer (E9-8) |
+| **3. Maximum ingestion performance** | **Improved, not proven best** | Table below | **No valid ceiling yet** (E10-1: the replay harness came out *slower* than the server, unexplained), no comparison with any other tool, no server-class hardware, no soak (E10-2..E10-4) |
 
-* **E1** benchmark harness (`./gradlew benchmark`), per-stage metrics (`docs/METRICS.md`), pinned environment, plans.
-* **E2-1, E2-3** cached signatures, `@CompileStatic` on the hot path, environment lookups cached.
-* **E3-1** uniqueness constraints instead of plain indexes (`SchemaManager`, `KEY_CONSTRAINT`): no duplicates under concurrent writers.
-* **E3-2** one write transaction per phase: 2 commits per batch instead of 7.
-* **E4-1, E4-2** `BatchPipeline`: the next batch is parsed while one is written; `WRITER_THREADS` writers in parallel with one
-  global lock order (without it writers deadlocked).
-* **Bug fixes** E5-6 (a failover must requeue, never dead-letter: data errors are an allow-list), E9-1 (messages cannot overwrite
-  `Uuid`/`TheLinkAddedDate`/their own Name etc.), and `ENABLE_METRICS=Y` never having worked.
-* Behaviour changes to know before deploying are in the README "Upgrade notes".
+**On "beyond anything else available":** nothing in this repository supports that claim yet. We know we are 1.4-4.1x faster
+than the old code on one laptop. We do not know how close we are to what the database can take (E10-1), how we compare with
+the other live-ingestion patterns, the Neo4j Kafka connector and the Spark connector (E10-2), or what a server with real disks and
+a network does (E10-3). Until E10-1 and E10-2 exist, say "faster than the previous version", not "faster than X".
+Decided 2026-11-02: the comparables are **Kafka and Spark**, because they are live ingestion like this server. `neo4j-admin import`
+is **not** a competitor (offline, file-level, bypasses transactions and logs); it stays only as the initial-load path (E7-1).
+Comparisons must be on a comparable base (E10-2 rules): same database container and settings, same data and verified same graph,
+durability on, the same total CPU/memory budget for each tool's whole pipeline, run on the same hardware (E10-3).
+
+## Performance, measured (150k messages, pinned Community container 4 CPUs / 2 GB heap on Docker Desktop, msg/s)
+| Profile | Old code | Now, default (1 writer) | Now, 4 writers | Default gain | 4-writer gain |
+|---|---|---|---|---|---|
+| hubs3 (the sample message) | 10,979 | 20,299 | 30,003 | 1.8x | 2.7x |
+| unique-dest | 8,203 | 12,709 | 33,856 | 1.5x | 4.1x |
+| node-only | 34,469 | 52,019 | 118,413 | 1.5x | 3.4x |
+| hub-fanout | 20,682 | 29,441 | 40,363 | 1.4x | 2.0x |
+| wide (41 properties) | 5,244 | 7,567 | 8,572 | 1.4x | 1.6x |
+
+Read these with the caveats: laptop; client, broker and database share the machine; the benchmark feeds the pipeline from
+memory, not through RabbitMQ; **the default is 1 writer** (`WRITER_THREADS=1`), so the left gain column is what a deployment
+gets unless someone changes it. The hub profiles do not scale with writers (efficiency at 4 writers 37% hubs3, 34% hub-fanout,
+28% wide, 67% unique-dest): a relationship write-locks both ends until commit. Where the gains came from: E2 cached signatures and
+`@CompileStatic` (+6..16%), E3-2 one transaction per phase (2 commits per batch instead of 7), E4-1 parse overlaps write
+(+14..37%), E4-2 parallel writers with one global lock order. Cost: the uniqueness constraint takes 3-13% on create-heavy profiles.
+A cluster costs a further 16-45% of write throughput (quorum commits): it is for availability, not speed.
+
+## What E10-1 found so far (2026-11-02; `docs/benchmarks/README.md`, last section)
+* `./gradlew ceiling` replays the server's statements through raw sessions; the graph is checked identical to the server's. But the
+  **real server beat that replay in all 10 interleaved cases (104-135%)**, so it is a lower bound, not a ceiling, and the cause is
+  unexplained (cold store, heap, session reuse ruled out; memory locality of the pre-built rows is the untested guess). No
+  "% of ceiling" is claimed anywhere.
+* **Batch 2000 instead of 500 is a measured win in the real server**: +16..46% on node-only, hubs3, hub-fanout, nothing on wide or
+  unique-dest; costs latency (p99 up to 5x) and memory. Default unchanged; decision is E3-14.
+* Hub profiles saturate near 38k (hubs3), 45k (hub-fanout), 8k (wide) however many sessions: the statement shape is the limit.
+* Java 21 -> 25 and Micronaut 4 -> 5 did not slow the hub profiles. node-only at 1 writer reads 43-46k against 52k on 11-01 (and
+  141-156k against 118k at 4 writers): the noisiest profile, unresolved.
+
+## Where the remaining speed probably is (hypotheses)
+0. **`BATCH_SIZE` 2000** (E3-14): measured, see above; the cheapest gain on the board.
+1. **Make more than one writer safe by default** (E4-3 key-aware routing): the gain from 1 to 4 writers is 1.1-3.9x, but two
+   batches carrying the same node can then commit out of order, so the default stays 1.
+2. **Hubs** (E3-7 remainder, E3-8 super-node strategy, E3-9 initial-load `CREATE`): hub profiles are the sample message's shape.
+3. **Server-side batching and parallelism** (E3-3, E3-4, E3-6, E3-13 `DISJOINT BY`): fewer round trips, error isolation inside the
+   database. Untested whether it beats application-level writers.
+4. **App CPU** (E2-2 parse once, E2-4/5/6): matters once the database is no longer the limit, which on node-only already nearly holds.
+5. **Broker** (E6-1 prefetch knee, E6-2 sharded queues): unmeasured; the benchmark bypasses RabbitMQ (E10-4).
+6. **Offline bulk path** (E7-1 `neo4j-admin import`) for initial loads: the fastest way to load a large first batch by design, but not a like-for-like comparison with this server.
+
+## State of the repository
+Four commits on `main`, not pushed (`main` is ahead of `origin/main` by 4): `6c460b6` platform, `8b9c136` core, correctness and
+schema, `b532ff6` pipeline, `0a4548a` benchmark, specs, environments, docs. **`6c460b6` and `8b9c136` do not compile on their
+own** (`MessageServerCommand.groovy` is committed in `b532ff6` but needed earlier); `b532ff6` and HEAD do (E8-8). Squash the
+first three, or accept it.
+
+**Uncommitted, 2026-11-02 (afternoon): platform upgrade** (`build.gradle`, `gradle.properties`, Gradle wrapper 9.8.2, `Dockerfile`, `Jenkinsfile`, `.github/workflows/docker-build.yml`, `docs/DEPENDENCIES.md`), **E10-1** (`src/benchmark/.../CeilingRunner.groovy`, `src/test/.../benchmark/CeilingRunnerSpecification.groovy`, the `ceiling` Gradle task, six `docs/benchmarks/2026-11-02-{ceiling,server-java25,server-batch2000}-*.md` reports). **Uncommitted, 2026-11-02 (cluster work):** `docker-compose.cluster.yml` (fixed discovery setting and healthcheck), `SchemaManager`
+(existing-constraint handling, node-key upgrade), `SchemaManagerSpecification` (rewritten, 16 specs), `SchemaConstraintSpecification`
+(+1), new `ClusterSpecification`, new `scripts/cluster-quorum-loss-e2e.sh`, new `docs/CLUSTER.md`, `docs/benchmarks/2026-11-02-*.md`
+(4 reports), and edits to `README.md`, `CLAUDE.md`, `RESUME.md`, `docs/KANBAN.md`, `docs/benchmarks/README.md`. Suggested commit:
+"Validate on a real Neo4j cluster: fix the cluster compose file, make node keys and existing constraints work, add the failover checks".
+
+Suite: **206 tests, 0 failures, 10 skipped** (full run 2026-11-03 on JDK 25, including `CeilingRunnerSpecification`'s 7) (4 need external infrastructure; the rest are the cluster specs, run only with
+`RUN_CLUSTER_TESTS=Y`). No containers are running.
+
+## Cluster validation, 2026-11-02 (details and tables: `docs/CLUSTER.md`)
+* The compose file was wrong for Neo4j 2026: `dbms.cluster.discovery.endpoints` is silently ignored (now `dbms.cluster.endpoints`),
+  so three "healthy" containers were three standalone databases. Fixed; healthy now means "all 3 members online".
+* `NotALeader` is a `ClientException` and is requeued (E5-6 confirmed live). Leader stopped (12 s) or killed (37 s) under load:
+  nothing lost or duplicated. **Quorum lost for 55 s with the real server and RabbitMQ: 1-2 batches requeued, stream resumed by itself,
+  200,000 employees exactly once, queue empty, nothing dead-lettered** (`scripts/cluster-quorum-loss-e2e.sh` prints `RESULT: PASS`).
+* Bug found and fixed: a node key and a uniqueness constraint on the same keys conflict in both directions; `nodekey` over an
+  existing constraint did nothing, silently. `SchemaManager` now checks what exists first.
 
 ## Decisions waiting for a human
-1. **Default for `WRITER_THREADS`.** It is 1, which keeps batches in arrival order (the last message for a node wins). More
-   writers are up to 3.9x faster on messages that do not share nodes, but two batches carrying the same node can then commit in
-   either order. Options: leave at 1, set 4 where order across batches does not matter, or build E4-3 (key-aware routing) first.
-2. **Commit the work.** 63 files, no commits since `941d7e8`. Suggested split: dependency upgrade and Card/Redis removal;
-   correctness fixes (E5-6, E9-1, schema/constraints); throughput (E2, E3-2, E4); benchmark harness and docs. Not done because
-   committing was not asked for.
-3. **The Enterprise cluster has never been run.** `docker-compose.cluster.yml` (3 primaries, optional reader, evaluation
-   licence) is written and validates, but Docker Desktop could not pull `neo4j:2026.10.1-enterprise`: its daemon goes through the
-   internal proxy `http.docker.internal:3128` and gets "TLS handshake timeout" while the shell reaches Docker Hub directly (the
-   network in use on 2026-11-01 may block large pulls). Try on another network, or check Docker Desktop > Settings >
-   Resources > Proxies, restart it, then `docker pull neo4j:2026.10.1-enterprise` and follow the header of the compose file.
-   Waiting on it: the live failover check (E5-3), NODE KEY verification (E3-12), Enterprise numbers (E1-5). Expect a cluster to
-   be no faster for writes than one instance (one leader, quorum commit); its value is availability and reads.
-4. E7-3, a dependency currency audit ("latest drivers for the whole stack"), is defined but not started.
+1. **Default for `WRITER_THREADS`** (now 1, keeps batch order; more is up to 3.9x faster on messages that do not share nodes but a node
+   in two batches can commit in either order). Leave at 1, set 4 where order across batches does not matter, or build E4-3 first.
+2. **Commit history**: squash the first three commits into one buildable commit (E8-8), and commit the cluster work. Local and unpushed.
+3. **E10-1 next step:** find out why the replay is slower than the server (feed rows from a producer thread rather than pre-built memory), or define the ceiling another way. Separately and cheaper: decide E3-14 (`BATCH_SIZE` 2000).
+4. **Retry window** (E5-8): the driver rides through 30 s, a killed leader takes 37 s; longer outages requeue, which is verified safe.
+5. E7-3 (dependency audit, "latest drivers for the whole stack") is defined, not started.
 
 ## Known limits (not bugs)
-* Messages that all point at the same few nodes (hubs) scale poorly with writers: a relationship write-locks both ends until
-  commit. E3-7 acceptance (60% efficiency at 4 writers) is not met for hub profiles: 37% hubs3, 34% hub-fanout, 28% wide, 67% unique-dest.
-* The uniqueness constraint costs a little on every node create: -8..-13% on the most create-heavy profile.
+* Hub-bound messages scale poorly with writers (above). E3-7 acceptance (60% efficiency at 4 writers) is **not met** for hub profiles.
 * E2-1 grouping under 5 us per message holds for 3 of 5 profiles (wide 8.0, unique-dest 5.7): E2-6.
-* Community exposes no server metrics over Bolt, so server-side page cache ratio and lock waits are not recorded (E1-5).
-
-## Next candidates (P0/P1 first)
-E4-3 key-aware routing (unlocks more than one writer safely) - E3-7 remainder with E3-8 / E3-9 (hub cost) - E3-13 `DISJOINT BY`
-evaluation - E3-3 / E3-4 server-side batching and error isolation - E5-3 live failover (needs the cluster) - E8-2 CI with a
-regression gate (needs runs of at least 150k messages, +-5% is noise) - E6-4 dead-letter replay tool.
+* Community exposes no server metrics over Bolt, so page cache ratio and lock waits are not recorded (E1-5).
+* Cleanup that `DETACH DELETE`s a hub with hundreds of thousands of relationships exhausts a 1 GB-heap cluster member (E1-6).
+* The dev `docker-compose.yml` RabbitMQ service failed to start on 2026-11-02 (E8-7); a plain `docker run` works.
+* Enterprise single-instance (2 CPUs, 1 GB heap) matched Community (4 CPUs, 2 GB) on hub profiles; unexplained (E1-7).
+* Behaviour changes to know before deploying are in the README "Upgrade notes".
 
 ## How to work here
+* **Builds need JDK 25** (the Micronaut Gradle plugin refuses to run on 21). It is installed keg-only: `export
+  JAVA_HOME=/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home` before `./gradlew`.
+* Ceiling: `NEO4J_BOLT_PORT=7688 ./gradlew ceiling --args="--container=neo4j-bench --messages=150000 --warmup=10 --sessions=1,4 --batches=500 --compare=1,4 --repeats=3 --label=x --out=docs/benchmarks"`.
 * Benchmarks: `docs/benchmarks/README.md`. Pinned database: `docker compose -f docker-compose.benchmark.yml up -d --wait
-  --pull never` (the image is cached locally), `NEO4J_BOLT_PORT=7688 ./gradlew benchmark --args="--container=neo4j-bench
-  --messages=150000 --warmup=10 --writers=1 --label=x --out=docs/benchmarks"`. Compare only runs of >=150k messages on a warm
-  container; +-5% is noise.
+  --pull never`, `NEO4J_BOLT_PORT=7688 ./gradlew benchmark --args="--container=neo4j-bench --messages=150000 --warmup=10
+  --writers=1 --label=x --out=docs/benchmarks"`. Compare only runs of >=150k messages on a warm container; +-5% is noise.
+* The cluster: `docker compose -f docker-compose.cluster.yml up -d --wait --pull never`, `RUN_CLUSTER_TESTS=Y ./gradlew test --tests
+  '*ClusterSpecification'`, `scripts/cluster-quorum-loss-e2e.sh`; inside a container always `cypher-shell -a bolt://localhost:7687`.
+  Tear down with `down -v`.
 * **Never run two `./gradlew test` at once** (both start a server on port 8081).
 * The kanban lives in `docs/KANBAN.md` only (standing decision for all git projects); do not set up the Neo4j kanban plugin.
-* Unused `lib/*.jar`, `micronaut-cli.yml` and `kubernetes/message-server-deploy.yml` (hard-coded IPs, third-party image) are
-  left untouched (E8-4).
-
-## How to verify quickly
+* Quick verification:
 ```
 ./gradlew test --tests '*Neo4JNodeSpecification' --tests '*MessageParserSpecification' --tests '*PhaseTransactionSpecification' \
   --tests '*BatchPipelineSpecification' --tests '*LockOrderingSpecification'    # seconds, no Docker
 ./gradlew test                                                                  # ~3 min, needs Docker
+RUN_CLUSTER_TESTS=Y ./gradlew test --tests '*ClusterSpecification'              # ~2.5 min, needs the cluster up
 ```

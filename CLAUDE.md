@@ -1,7 +1,7 @@
 # message-server
 
 Consumes JSON "harvester" messages from RabbitMQ and writes them to Neo4j as nodes and relationships (batched
-UNWIND/MERGE). Groovy 4 + Micronaut 4, Java 21. Goal of the current phase: maximum import throughput without losing
+UNWIND/MERGE). Groovy 5 + Micronaut 5, Java 25 (needs a JDK 25 to build: the Micronaut Gradle plugin refuses to run on 21; versions in `docs/DEPENDENCIES.md`). Goal of the current phase: maximum import throughput without losing
 correctness. Read `docs/THROUGHPUT.md` for the analysis and `docs/KANBAN.md` for planned work; `RESUME.md` has the
 current state.
 
@@ -60,6 +60,11 @@ current state.
 - Every statement sent to Neo4j goes through `Cypher.versioned()` (pins `CYPHER 25`; a database with no
   `db.query.default_language` falls back to Cypher 5, and `DISJOINT BY` needs Cypher 25). Don't bypass it.
 - Neo4j 5+ syntax only: `CREATE CONSTRAINT IF NOT EXISTS FOR ...`, `randomUUID()` (no APOC).
+- Cluster facts verified 2026-11-02 (`docs/CLUSTER.md`, `RUN_CLUSTER_TESTS=Y ./gradlew test --tests '*ClusterSpecification'` with
+  `docker-compose.cluster.yml` up): `NotALeader` is a `ClientException` and must requeue; Neo4j 2026 uses `dbms.cluster.endpoints`
+  (the old discovery setting is silently ignored and servers start standalone); a node key and a uniqueness constraint on the same
+  keys conflict in both directions (`SchemaManager` checks what exists first); inside a container use `bolt://localhost:7687`, never
+  the default `neo4j://`.
 - A node type is merged on its dimension keys, which carry a uniqueness constraint (`SchemaManager`, `KEY_CONSTRAINT`):
   that is what makes concurrent writers safe (without it 4 writers made 412 nodes for 300 ids). A plain index from an
   older version is dropped to make room; existing duplicates fall back to a plain index plus an ERROR log. Neo4j throws

@@ -76,7 +76,36 @@ Resulting Graph
 ## Objectives
 The primary objective of this project is to update the graph as fast as possible. 
 - Messages are streamed off of the Rabbit queue into batches. The batch size defaults to 500 but can be configured (see Environment/Configuration Variables below.) 
-- Batches are currently processed one at a time on one writer; parallel writers are on the roadmap (`docs/KANBAN.md`, `docs/THROUGHPUT.md`).
+- The next batch is parsed while the previous one is written (a pipeline), and `WRITER_THREADS` can write several batches at once.
+- Planned work is on the board in `docs/KANBAN.md`; the analysis behind it is in `docs/THROUGHPUT.md`.
+
+## Performance
+Measured on a pinned Neo4j 2026.10.1 Community container (4 CPUs, 8 GB, 2 GB heap and page cache) on one Docker host, 150,000
+messages per profile, parse + group + write with **no RabbitMQ in the loop** (`docs/benchmarks/README.md` has the method, the
+environment of every run and the raw reports). The numbers are messages per second.
+
+| Profile | What it is | First measurement (2026-11-01, batch 500, 1 writer) | Now (2026-11-02, Java 25, batch 500, 1 writer) | Now, 4 writers | Now, batch 2000, 4 writers |
+|---|---|---|---|---|---|
+| node-only | nodes, no relationships | 34,469 | 43,639 | 140,919 | 163,455 |
+| hubs3 | each message links 3 shared hub nodes | 10,979 | 21,317 | 31,151 | 38,769 |
+| hub-fanout | each message links 1 shared hub node | 20,682 | 32,908 | 40,348 | 49,660 |
+| wide | many properties and relationships per message | 5,244 | 7,761 | 8,803 | 8,484 |
+| unique-dest | each message links 3 unique nodes | 8,203 | 12,834 | 35,971 | 35,272 |
+
+What to take from it, and what not to:
+- Statement batching, one transaction per phase, the parse/write pipeline and parallel writers account for the gain. The first
+  column was taken before several of those changes (and before the uniqueness constraint, which costs up to about 10% on
+  node creation); the Java 21 to 25 upgrade did not change the hub profiles.
+- Messages that all point at the same few nodes (hubs) saturate near 38k (hubs3), 45k (hub-fanout) and 8k (wide) msg/s however
+  many writers or sessions there are: a relationship write-locks both ends. More writers only help workloads that do not share nodes.
+- `BATCH_SIZE` 2000 instead of 500 gave +16% to +46% on node-only, hubs3 and hub-fanout and nothing on wide and unique-dest, at
+  the cost of up to about 5x the p99 batch time. This is a single run per cell and under 5% is noise. The default stays 500
+  until KANBAN E3-14 has checked it further.
+- These are single-instance Community numbers on one laptop-class Docker host. A 3-member cluster costs 16-45% of write
+  throughput (`docs/CLUSTER.md`). They say nothing yet about Kafka or Spark connectors, server-class hardware, or the path through
+  RabbitMQ at scale (KANBAN E10-2 to E10-4). **No claim is made that this is faster than any other tool.**
+- The replay "ceiling" harness (`./gradlew ceiling`) turned out to be a lower bound (the real server beat it by 4-35%), so no
+  "percent of ceiling" is quoted. See `docs/benchmarks/README.md`.
 
 ## Principals
 
@@ -95,9 +124,9 @@ There are a number of tests that validate the correctness of the implementation.
 
 ## Technology
 
-- JVM (Java 21) (https://openjdk.java.net/)
-- Groovy (4.0.x, managed by Micronaut) (https://groovy-lang.org/)
-- Micronaut (4.10.x) (https://micronaut.io/)
+- JVM (Java 25) (https://openjdk.java.net/)
+- Groovy (5.0.x, managed by Micronaut) (https://groovy-lang.org/)
+- Micronaut (5.2.x) (https://micronaut.io/)
 - Project Reactor (https://projectreactor.io/)
 - RabbitMQ (https://www.rabbitmq.com/)
 - Neo4J 5.x / 2026.x (https://neo4j.com/) with Java driver 6.3
@@ -111,7 +140,7 @@ Testing
 ## Solution Overview
 The message processing solution consists of three primary classes, a few utility classes and tests in the form of Spock specifications. This section describes each of the major components, how they relate and anything significant about them. 
 
-At a high level, the system reads messages from a Rabbit MQ queue, collects the message stream into batches, converts each entry in the batch to a series of Neo4J Cypher statements and applies the batch in a single transaction to update the graph database.
+At a high level, the system reads messages from a Rabbit MQ queue, collects the message stream into batches, converts each entry in the batch to a series of Neo4J Cypher statements and writes the batch to the graph database in at most three transactions (nodes, relationships, node deletes).
 
 
 ![Component Diagram](doc/assets/Component Diagram.png)
@@ -149,18 +178,17 @@ A couple of things to note
 The server sets up a Reactive stream to listen for messages on the Rabbit queue. 
 
 ```groovy
-RabbitFlux.createReceiver(receiverOptions).consumeAutoAck(ApplicationConfiguration.rabbitMQQueue)
-        .map({ rabbitMsg -> new String(rabbitMsg.getBody()) })
-        .bufferTimeout(ApplicationConfiguration.rabbitMQBatchSize, Duration.ofSeconds(2))
-        .map({ messages -> MessageBatchProcessor.process(messages, driver) })
-        .map({ messageBatchResult -> logBatchResult(messageBatchResult) })
-        .subscribe()
+receiver.consumeManualAck(queue, new ConsumeOptions().qos(prefetch))
+        .bufferTimeout(batchSize, Duration.ofSeconds(2), true)
+        .map({ deliveries -> new Batch(deliveries, deliveries.collect { new String(it.getBody(), UTF_8) }) })
+        // BatchPipeline: parse on PARSER_THREADS, write on WRITER_THREADS, ack after commit, nack+requeue on infrastructure errors
+        BatchPipeline.run(batches, driver, registry, parsers, writers, ...)
 ```
 
-Messages flow in, their contents are pulled out into Strings.
+Messages flow in unacknowledged, their contents are pulled out into Strings.
 The buffer fills until the batch size is met or two seconds have elapsed.
 The batch is sent to the MessageMatchProcessor.
-The results are logged. 
+Each batch is acknowledged only after it commits. The results are logged. 
 
  
 ### Message Batch Processor 
@@ -172,7 +200,7 @@ The messages in each sub batch are processed.
 - Parameters for each of the primary nodes are collected into a list. An UNWIND is prepended to the primary node merge and the batch is sent off to Neo4J.
 
 #### Error Handling
-Messages are acknowledged only after their batch is committed. Each statement group runs in its own managed transaction (the driver retries transient errors). Three kinds of failure are handled differently:
+Messages are acknowledged only after their batch is committed. A batch is written in at most three managed write transactions (nodes, relationships, node deletes; the driver retries transient errors). Three kinds of failure are handled differently:
 - **Invalid messages** (schema violations, malformed JSON) are reported individually and the rest of the batch proceeds.
 - **Data errors** from Neo4j (for example a nested object used as a property value) cause the group to be split in half and retried recursively until the offending message is isolated (inspired by git bisect). Splitting never drops elements.
 - **Infrastructure errors** (connection lost, authentication, exhausted transient retries) are not the data's fault: the whole batch is nacked and requeued after a short pause. Every statement is an idempotent MERGE, so reprocessing is safe.
@@ -193,7 +221,7 @@ The project is built using Gradle (https://gradle.org). All of the external depe
 
 ## How to Build/Run 
 
-Ensure you have a JDK installed (version 21+). I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
+Ensure you have a JDK 25 installed (the Micronaut Gradle plugin refuses to run on 21; versions are listed in `docs/DEPENDENCIES.md`). I highly recommend SDKMan (https://sdkman.io/) to manage Java and related tooling versions. 
 
 Execute the following from the command line
 
@@ -379,10 +407,11 @@ The code behind this endpoint is the equivalent of executing this cypher stateme
 - Only statement/schema errors are treated as bad data. Cluster errors (for example `NotALeader` during a failover) and anything unclassified requeue the batch instead of moving messages to `<queue>.errors`. Use a `neo4j://` host (`NEO4J_HOST=neo4j://...`) against a cluster so writes are routed to the leader.
 - Each node type now gets a **uniqueness constraint** on its dimension keys instead of a plain index (`KEY_CONSTRAINT`). Concurrent writers can no longer create duplicate nodes. On first use of a node type an index from an earlier version is dropped and replaced by the constraint (it brings its own index). If the graph already contains duplicate nodes the constraint cannot be created: the message server logs an ERROR with a query that finds the duplicates, keeps using a plain index, and runs without the guarantee until the duplicates are fixed and it is restarted. The constraint costs a little on every node create (up to about 10% throughput on workloads that mostly create new nodes, see `docs/benchmarks/`). A constraint violation is a bad-data error: the message goes to the error queue. Needs permission to create constraints.
 - The next batch is now parsed while the previous one is being written (a pipeline), which raised throughput by 14-37% in the benchmark with no change in behaviour. `WRITER_THREADS` above 1 writes several batches at once and scaled up to 3.9x on messages that do not share nodes, but **two batches that carry the same node can then commit in either order**, so the node keeps the properties of whichever committed last (with 1 writer the last message wins, as before). Messages that all point at the same few nodes (hubs) gain little from more writers because a relationship write-locks both ends. Statements and rows are sent in one global order (label, then key) so writers do not deadlock each other. RabbitMQ prefetch is now `batch size x (parsers + writers + 1)`.
+- **Clusters:** use a routing host (`NEO4J_HOST=neo4j://<host>`) so writes go to the leader. Verified against a 3-primary Enterprise cluster (`docs/CLUSTER.md`): a failover (graceful or hard) loses nothing, a write sent to a follower or while there is no quorum is requeued rather than dead-lettered, and 200,000 messages survived a 55 s quorum loss with every node exactly once. A cluster costs 16-45% of write throughput against a single instance with the same resources. `KEY_CONSTRAINT=nodekey` (Enterprise) now also upgrades an existing uniqueness constraint to a node key; Neo4j cannot hold both on the same keys.
 - A batch commits in at most 3 write transactions (nodes, relationships, node deletes) instead of one per statement.
 
 ## Documentation
-- `docs/THROUGHPUT.md` - throughput analysis and model; `docs/KANBAN.md` - planned work; `CLAUDE.md` - guide for Claude Code; `RESUME.md` - current state.
+- `docs/benchmarks/README.md` - benchmark method and every report; `docs/CLUSTER.md` - cluster behaviour; `docs/DEPENDENCIES.md` - versions and what was deliberately not upgraded; `docs/THROUGHPUT.md` - throughput analysis and model; `docs/KANBAN.md` - planned work; `CLAUDE.md` - guide for Claude Code; `RESUME.md` - current state.
 
 ## Exchange type
 Set `RABBITMQ_EXCHANGE_TYPE` (default `direct`).

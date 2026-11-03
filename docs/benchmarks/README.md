@@ -102,3 +102,50 @@ Parsers: 1 for up to 2 writers, 2 for 4 and 8. Transient retries (lock timeouts/
   not the default: hubs3 17.3k vs 20.6k with 1 writer, 23.2k vs 25.0k with 2, 30.8k vs 28.7k with 4 (+7%), hub-fanout no gain.
 * The Neo4j container has 4 CPUs and shares the Docker VM with the benchmark JVM; a larger server would move the
   saturation point of the scaling profiles, not the hub-bound ones.
+
+## Cluster and Enterprise (2026-11-02)
+Measured against a 3-node Enterprise cluster and a single Enterprise instance with one member's resources; the cluster is
+16-45% slower than that single instance, and 0 transient retries in any run. Table, method and caveats: `docs/CLUSTER.md`.
+Run the cluster benchmark with `NEO4J_HOST=neo4j://localhost NEO4J_BOLT_PORT=7687 ./gradlew benchmark --args="--server-hardware='...'
+--writers=4 --parsers=2 --label=cluster-w4 --out=docs/benchmarks"`.
+
+## The ceiling harness and what it showed (2026-11-02, KANBAN E10-1; Java 25, Micronaut 5)
+`./gradlew ceiling` (`CeilingRunner`) replays the server's own statements and rows through N raw driver sessions, with parsing,
+grouping, ordering and parameter building done beforehand and not timed. The graph it writes is checked against the server's
+(SHA-256 over every tagged node and relationship, spec-tested including that the check can fail). Pinned Community container,
+150k messages, 4 CPUs / 2 GB heap, Docker Desktop on a laptop.
+
+**The replay is not a ceiling.** Run interleaved with the real server pipeline (3 repeats, `2026-11-02-ceiling-vs-server.md`), the
+server was *faster* than the replay in every case, 104-135% of it, mostly with non-overlapping ranges. Not explained. Ruled out:
+a cold store (a warm-up pass is now in the harness), heap pressure (a one-profile run in a fresh JVM was no better), session
+reuse (a session per batch made no difference). Untested leading guess: the replay's prepared rows are long-lived objects and
+cost more to serialise than the server's freshly built ones (memory locality). Until that is understood the replay measures a
+lower bound, so **no "server % of ceiling" figure is claimed**, and the first matrix (`2026-11-02-ceiling-community-4cpu.md`)
+is evidence of where the database saturates, not of a maximum.
+
+What it does show, and the server confirms:
+* **Hub profiles saturate early whatever the client does.** hubs3 stops near 38k msg/s at 4 sessions (batch 2000), hub-fanout near
+  45k, wide near 8k; adding sessions beyond 2-4 does nothing. The statement shape, not the application, is the limit there.
+* **Application CPU per message** (parse+group+order+parameter maps, one thread): node-only 6 us, hub-fanout 10, hubs3 20,
+  unique-dest 30, wide 42. One parser thread therefore caps unique-dest near 34k msg/s and node-only near 165k, which is
+  where those profiles stop scaling with writers (`PARSER_THREADS` > 1 is the lever there, untested).
+
+**Batch size is a real lever, measured through the real server** (`server-java25-w*.md` at batch 500 against `server-batch2000-w*.md`;
+single runs, so treat differences under ~5% as noise):
+
+| msg/s | 1 writer, 500 | 1 writer, 2000 | 4 writers, 500 | 4 writers, 2000 |
+|---|---|---|---|---|
+| node-only | 43,639 | 63,852 (+46%) | 140,919 | 163,455 (+16%) |
+| hubs3 | 21,317 | 26,376 (+24%) | 31,151 | 38,769 (+24%) |
+| hub-fanout | 32,908 | 44,395 (+35%) | 40,348 | 49,660 (+23%) |
+| wide | 7,761 | 7,661 (-1%) | 8,803 | 8,484 (-4%) |
+| unique-dest | 12,834 | 13,190 (+3%) | 35,971 | 35,272 (-2%) |
+
+The cost is latency and memory: p99 batch time at 4 writers goes from 40/101/112/392/94 ms to 66/271/329/2,012/262 ms
+(node-only/hubs3/hub-fanout/wide/unique-dest), a bad message costs a bisect over a larger batch, and RabbitMQ prefetch grows
+with `BATCH_SIZE x (parsers + writers + 1)`. The default stays 500 until E3-14 decides.
+
+**Java 21 -> 25 and Micronaut 4 -> 5 cost nothing measurable** on the hub profiles (1 writer, batch 500, same container, hubs3
+20.3k -> 21.3k, hub-fanout 29.4k -> 32.9k, wide 7.6k -> 7.8k, unique-dest 12.7k -> 12.8k). **node-only is the exception to
+watch:** 1 writer read 43-46k against 52k on 2026-11-01 (4 writers 141-156k against 118k). That profile is the noisiest
+(see above); not resolved, so not called a regression or an improvement.
