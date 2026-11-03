@@ -26,7 +26,12 @@ import java.util.concurrent.ConcurrentHashMap
  *  - the graph already holds duplicates: the constraint cannot be created. The plain index is put back so MERGE stays
  *    fast, the problem is logged as an error with the query that finds the duplicates, and the node type runs without the
  *    guarantee until the duplicates are fixed and the server is restarted;
- *  - KEY_CONSTRAINT=nodekey on an edition without node keys: falls back to the uniqueness constraint;
+ *  - a constraint on the same keys already exists: a node key satisfies both modes and a uniqueness constraint satisfies
+ *    "unique", so nothing is created (asking for the other kind would fail with "conflicting constraint already exists",
+ *    which is why this is checked first);
+ *  - KEY_CONSTRAINT=nodekey and a uniqueness constraint exists: on Enterprise it is swapped for the node key (and restored
+ *    if that fails); on an edition without node keys it is left alone, so no constraint is dropped and rebuilt for nothing;
+ *  - KEY_CONSTRAINT=nodekey on an edition without node keys and no constraint yet: a uniqueness constraint is created;
  *  - schema privileges are missing: nothing is created and it is tried again on the next batch (as before).
  * The outcome is remembered, so a failing constraint is not retried (and logged) for every batch.
  */
@@ -64,6 +69,7 @@ class SchemaManager {
     /** For tests: forget what has been created so the next batch checks the database again. */
     static void forgetAll() {
         ensured.clear()
+        enterprise = null
     }
 
     private static void ensureConstraint(Neo4JNode node, Session session, boolean wantNodeKey) {
@@ -71,6 +77,13 @@ class SchemaManager {
         if (plainIndex != null) {
             log.info("Replacing the plain index {} on {} by a constraint", plainIndex, node.nodeType)
             run(session, "DROP INDEX " + Cypher.id(plainIndex) + " IF EXISTS")
+        }
+        Set<String> existing = constraintTypes(session, node)
+        if (existing.contains(NODE_KEY) || (!wantNodeKey && existing.contains(UNIQUENESS))) return   // already guaranteed
+        if (wantNodeKey && existing.contains(UNIQUENESS)) {
+            // A node key cannot be created next to the uniqueness constraint, so swap them, but only where node keys exist
+            if (isEnterprise(session)) upgradeUniquenessToNodeKey(node, session)
+            return
         }
         // Neo4j reports a constraint it cannot create as a database error (duplicates) or a client error (edition)
         Neo4jException failure = null
@@ -90,6 +103,52 @@ class SchemaManager {
                 "WHERE c > 1 RETURN key, c; merge or delete them, then restart the message server.",
                 node.nodeType, node.dimensionKeys(), failure?.message, Cypher.id(node.nodeType),
                 node.dimensionKeys().collect { String k -> ('n.' + Cypher.id(k)).toString() }.join(', '))
+    }
+
+    private static final String UNIQUENESS = "NODE_PROPERTY_UNIQUENESS"
+    private static final String NODE_KEY = "NODE_KEY"
+
+    /** Swap the uniqueness constraint for a node key; if the node key cannot be created, put the uniqueness constraint back. */
+    private static void upgradeUniquenessToNodeKey(Neo4JNode node, Session session) {
+        String uniqueness = constraintName(session, node, UNIQUENESS)
+        if (uniqueness == null) return
+        log.info("Replacing the uniqueness constraint {} on {} by a node key", uniqueness, node.nodeType)
+        run(session, "DROP CONSTRAINT " + Cypher.id(uniqueness) + " IF EXISTS")
+        try {
+            run(session, node.constraintCypher(true))
+        } catch (Neo4jException e) {
+            log.warn("The node key for {} could not replace the uniqueness constraint ({}), restoring it", node.nodeType, e.message)
+            run(session, node.constraintCypher(false))
+        }
+    }
+
+    /** The types of the constraints that exist on exactly this label and these keys. */
+    private static Set<String> constraintTypes(Session session, Neo4JNode node) {
+        Result result = session.run(Cypher.versioned(
+                "SHOW CONSTRAINTS YIELD type, labelsOrTypes, properties WHERE labelsOrTypes = [\$label] AND properties = \$keys RETURN type"),
+                [label: node.nodeType, keys: node.dimensionKeys()] as Map<String, Object>)
+        Set<String> types = new HashSet<>()
+        while (result.hasNext()) types.add(result.next().get("type").asString())
+        types
+    }
+
+    /** The name of the constraint of this type on exactly this label and these keys, if there is one. */
+    private static String constraintName(Session session, Neo4JNode node, String type) {
+        Result result = session.run(Cypher.versioned(
+                "SHOW CONSTRAINTS YIELD name, type, labelsOrTypes, properties WHERE type = '" + type + "' AND labelsOrTypes = [\$label] AND properties = \$keys RETURN name"),
+                [label: node.nodeType, keys: node.dimensionKeys()] as Map<String, Object>)
+        result.hasNext() ? result.next().get("name").asString() : null
+    }
+
+    private static volatile Boolean enterprise
+
+    /** Node keys exist only on Enterprise. Asked of the server once. */
+    private static boolean isEnterprise(Session session) {
+        if (enterprise == null) {
+            Result result = session.run(Cypher.versioned("CALL dbms.components() YIELD name, edition WHERE name = 'Neo4j Kernel' RETURN edition"))
+            enterprise = result.hasNext() && result.next().get("edition").asString().equalsIgnoreCase("enterprise")
+        }
+        enterprise
     }
 
     /** The name of a plain (not constraint-owned) range index on exactly this label and these keys, if there is one. */

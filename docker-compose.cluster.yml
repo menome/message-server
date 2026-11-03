@@ -7,13 +7,15 @@
 #
 #   docker compose -f docker-compose.cluster.yml up -d --wait
 #   NEO4J_HOST=neo4j://localhost NEO4J_BOLT_PORT=7687 <message server or benchmark>      # routing driver, finds the leader
-#   docker exec cluster-server1 cypher-shell -u neo4j -p password "SHOW DATABASES"        # who hosts what, who is online
-#   docker exec cluster-server1 cypher-shell -u neo4j -p password "CALL dbms.cluster.role('neo4j')"   # this server's role
+#   docker exec cluster-server1 cypher-shell -a bolt://localhost:7687 -u neo4j -p password \
+#     "SHOW DATABASES YIELD name, address, role, writer, currentStatus WHERE name = 'neo4j' RETURN address, role, writer"   # who is the leader
+#   (inside a container always pass -a bolt://localhost:7687: the default neo4j:// would follow the routing table to
+#    localhost:7688/7689, which are host-side addresses.)
 #   docker compose -f docker-compose.cluster.yml stop server1                              # kill a member (try the leader)
 #   docker compose -f docker-compose.cluster.yml down -v                                   # throw it all away
 #
 # Read replica: `docker compose -f docker-compose.cluster.yml --profile reader up -d --wait`, then
-#   docker exec cluster-server1 cypher-shell -u neo4j -p password -d system \
+#   docker exec cluster-server1 cypher-shell -a bolt://localhost:7687 -u neo4j -p password -d system \
 #     "ALTER DATABASE neo4j SET TOPOLOGY 3 PRIMARIES 1 SECONDARY"
 #
 # Each server advertises localhost:<its published Bolt port> so a neo4j:// driver on the host gets a routing table it can
@@ -29,15 +31,20 @@ x-neo4j: &neo4j
     NEO4J_server_memory_heap_initial__size: 1g
     NEO4J_server_memory_heap_max__size: 1g
     NEO4J_server_memory_pagecache_size: 1g
-    # Cluster: members find each other through the discovery endpoints; the default database gets 3 primaries
-    NEO4J_dbms_cluster_discovery_endpoints: server1:6000,server2:6000,server3:6000
+    # Cluster: members find each other through dbms.cluster.endpoints (Neo4j 2026; the older
+    # dbms.cluster.discovery.endpoints is ignored, and with no endpoints a server silently starts as a standalone DBMS).
+    # The default database gets 3 primaries.
+    NEO4J_dbms_cluster_endpoints: server1:6000,server2:6000,server3:6000
     NEO4J_initial_dbms_default__primaries__count: 3
     NEO4J_initial_dbms_default__secondaries__count: 0
     NEO4J_server_cluster_listen__address: 0.0.0.0:6000
     NEO4J_server_cluster_raft_listen__address: 0.0.0.0:7000
     NEO4J_server_bolt_listen__address: 0.0.0.0:7687
   healthcheck:
-    test: ["CMD-SHELL", "cypher-shell -u neo4j -p $${NEO4J_PASSWORD:-password} 'RETURN 1' || exit 1"]
+    # Healthy = the cluster has formed: at least 3 servers report the default database online. Uses a direct bolt://
+    # connection: cypher-shell's default neo4j:// follows the routing table to the advertised localhost:768x addresses,
+    # which are only reachable from the host, not from inside a container.
+    test: ["CMD-SHELL", "P=$${NEO4J_AUTH#neo4j/}; cypher-shell -a bolt://localhost:7687 -u neo4j -p \"$$P\" --format plain \"SHOW DATABASES YIELD name, currentStatus WHERE name = 'neo4j' AND currentStatus = 'online' RETURN count(*) >= 3 AS formed\" | tail -1 | grep -qx TRUE"]
     interval: 5s
     retries: 60
 

@@ -107,6 +107,26 @@ class SchemaConstraintSpecification extends MessagingWithTestContainersSpecifica
         count() == 10
     }
 
+    def "KEY_CONSTRAINT=nodekey on an edition without node keys keeps the uniqueness constraint it has, untouched"() {
+        given:
+        MessageBatchProcessor.process((1..5).collect { message(it) }, driver)
+        String before = driver.session().run("SHOW CONSTRAINTS YIELD name, labelsOrTypes WHERE labelsOrTypes = ['${LABEL}'] RETURN name").single().get("name").asString()
+        SchemaManager.forgetAll()
+        System.setProperty(com.menome.util.PreferenceType.KEY_CONSTRAINT.name(), "nodekey")
+
+        when:
+        MessageBatchResult result = MessageBatchProcessor.process((6..10).collect { message(it) }, driver)
+
+        then:
+        result.batchSummary.errorCount == 0
+        // same constraint, same name: it was not dropped and recreated (which would rebuild its index for nothing)
+        driver.session().run("SHOW CONSTRAINTS YIELD name, type, labelsOrTypes WHERE labelsOrTypes = ['${LABEL}'] RETURN name, type").list { it.asMap() } == [[name: before, type: "NODE_PROPERTY_UNIQUENESS"]]
+        count() == 10
+
+        cleanup:
+        System.clearProperty(com.menome.util.PreferenceType.KEY_CONSTRAINT.name())
+    }
+
     def "a graph that already holds duplicates keeps working on a plain index, loudly, and without a constraint"() {
         given:
         driver.session().run("CREATE (:`${LABEL}` {Id: 1, SourceSystem: '${Workloads.SOURCE_SYSTEM}'}), (:`${LABEL}` {Id: 1, SourceSystem: '${Workloads.SOURCE_SYSTEM}'})").consume()
