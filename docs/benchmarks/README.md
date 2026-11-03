@@ -149,3 +149,27 @@ with `BATCH_SIZE x (parsers + writers + 1)`. The default stays 500 until E3-14 d
 20.3k -> 21.3k, hub-fanout 29.4k -> 32.9k, wide 7.6k -> 7.8k, unique-dest 12.7k -> 12.8k). **node-only is the exception to
 watch:** 1 writer read 43-46k against 52k on 2026-11-01 (4 writers 141-156k against 118k). That profile is the noisiest
 (see above); not resolved, so not called a regression or an improvement.
+
+## Batch size through the real server (E3-14), 2026-11-03
+Pinned Community container, 150,000 messages, `--parsers=1`, one run per cell (reports `2026-11-03-e3-14-batch<N>-w<W>.md`). Warm-up was
+10 / 3 / 2 / 1 batches for 500 / 2000 / 5000 / 10000, so the 10000 column has about 14 measured batches: its p99 means little.
+A first attempt at 300,000 messages failed on the hub profiles with "memory pool limit exceeded" (not a batch-size effect; hubs
+with 300k relationships), so 150k it is. Run-to-run spread is large: batch 500 at 1 writer read node-only 32.8k here and 43.6k
+on 2026-11-02, so treat differences under about 15-20% as noise on node-only.
+
+| msg/s | 1 writer: 500 | 2000 | 5000 | 10000 | 4 writers: 500 | 2000 | 5000 | 10000 |
+|---|---|---|---|---|---|---|---|---|
+| node-only | 32,752 | 57,562 | 55,912 | 56,956 | 137,542 | 130,250 | 107,955 | 119,641 |
+| hubs3 | 17,031 | 22,951 | 23,663 | 23,483 | 28,695 | 35,985 | 35,085 | 31,638 |
+| hub-fanout | 27,462 | 37,806 | 38,027 | 37,254 | 38,930 | 45,385 | 43,474 | 43,813 |
+| wide | 7,051 | 7,081 | 7,130 | 6,993 | 8,530 | 8,114 | 8,051 | 8,393 |
+| unique-dest | 11,490 | 12,371 | 11,561 | 10,748 | 35,971 | 32,198 | 28,946 | 24,815 |
+
+p99 batch ms at 1 writer, 500 / 2000 / 5000 / 10000: node-only 34 / 60 / 152 / 270, hubs3 80 / 142 / 321 / 640, hub-fanout 38 / 94 /
+205 / 392, wide 118 / 534 / 1,001 / 2,288, unique-dest 89 / 277 / 606 / 1,200. At 4 writers wide reaches 1.9 s at 2000 and 3.9 s at 5000.
+
+Reading it: the gain stops at 2000 (nothing above it helps at 1 writer). At 1 writer, 2000 is +35-38% on hubs3 and hub-fanout, +8%
+on unique-dest, flat on wide, and large on node-only (inflated by a low 500 cell). At 4 writers it helps only the hub profiles
+(+25% hubs3, +17% hub-fanout) and costs unique-dest 10% (32.2k vs 36.0k), and it is flat or negative on node-only and wide; bigger
+batches are worse there. Latency grows linearly with the batch. Not measured yet: bisect cost with one bad message in 5,000, the
+2-second `bufferTimeout` at low rates, unacked-message memory.
