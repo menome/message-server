@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 RUN useradd --system --uid 10001 messageserver
 COPY build/libs/messageServer-*-all.jar /app/messageServer.jar
 USER messageserver

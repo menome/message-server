@@ -1,12 +1,12 @@
 plugins {
     id "groovy"
-    id "com.gradleup.shadow" version "8.3.10"
+    id "com.gradleup.shadow" version "9.6.1"
     id "application"
-    id "io.micronaut.application" version "4.6.2"
+    id "io.micronaut.application" version "5.0.2"
 }
 
-version "1.0"
-group "com.menome"
+version = "1.0"
+group = "com.menome"
 
 repositories {
     mavenCentral()
@@ -37,7 +37,7 @@ dependencies {
     testImplementation(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
     testImplementation("io.micronaut:micronaut-inject-groovy")
     testImplementation("io.micronaut.test:micronaut-test-spock")
-    testImplementation("org.spockframework:spock-core:2.4-groovy-4.0") {
+    testImplementation("org.spockframework:spock-core:2.4-groovy-5.0") {
         exclude group: "org.apache.groovy"
     }
     testImplementation('org.awaitility:awaitility-groovy:4.3.0')
@@ -58,8 +58,8 @@ application {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 micronaut {
@@ -73,7 +73,7 @@ micronaut {
 
 shadowJar {
     mergeServiceFiles()
-    zip64 true
+    zip64 = true
 }
 
 // Throughput benchmark (KANBAN E1-1): own source set so it never ships in the jar, runs against the NEO4J_* env vars
@@ -101,8 +101,19 @@ tasks.register('benchmark', JavaExec) {
     outputs.upToDateWhen { false }
 }
 
+// The ceiling (KANBAN E10-1): what the database takes for the server's own statements with nothing else around them
+tasks.register('ceiling', JavaExec) {
+    group = 'verification'
+    description = 'Runs the database ceiling benchmark; pass options with --args="--profiles=hubs3 --messages=150000 --sessions=1,4"'
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'com.menome.benchmark.CeilingRunner'
+    workingDir = projectDir
+    dependsOn classes
+    outputs.upToDateWhen { false }
+}
+
 // The benchmark needs the full JIT, so it is the one JavaExec task that skips these flags
 tasks.withType(JavaExec).configureEach {
-    if (name == 'benchmark') return
+    if (name == 'benchmark' || name == 'ceiling') return
     jvmArgs('-XX:TieredStopAtLevel=1', '-Dcom.sun.management.jmxremote')
 }
