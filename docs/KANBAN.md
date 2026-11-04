@@ -2,7 +2,7 @@
 
 Single source of truth for planned work (kanban lives in MD files in git, by standing decision). Move a story by
 cutting it to the next column. Priority: P0 do first, P1 next, P2 later. Size: S <1d, M 1-3d, L 3-5d.
-Background and numbers: `docs/THROUGHPUT.md`, measured results in `docs/benchmarks/README.md`. Last updated 2026-11-02 (review): 32 stories done, 53 in Backlog (E10-1 in progress, E3-14 new)
+Background and numbers: `docs/THROUGHPUT.md`, measured results in `docs/benchmarks/README.md`. Last updated 2026-11-05
 (P0: E3-7 partly done, plus E10-1 in progress). Move a story to In progress when you start it and to Done, with what was measured, when you finish.
 
 ## Goal
@@ -51,6 +51,7 @@ laptop; **"faster than anything else" is not yet shown** because the ceiling and
 | E7-3 + E8-1 Latest of everything | 2026-11-02, `docs/DEPENDENCIES.md`: Java 21 -> 25 (newest LTS; Dockerfile, GitHub workflow, Jenkinsfile), Gradle 8.14.3 -> 9.8.2, Shadow 9.6.1, Micronaut 4.10.22 -> 5.2.4 (plugin 5.0.2, which itself requires a JVM 25), Groovy 4 -> 5.0.8, Spock 2.4-groovy-5.0; every library already the newest release, Neo4j 2026.10.1 and the driver 6.3.0 still current. No source change needed; suite 199 tests, 0 failures, 10 skipped. **Deferred:** Groovy 6.0.0 (the Micronaut 5.2.4 BOM is on 5.0.8) |
 | E3-14 Batch size default | 2026-11-03: `RABBITMQ_BATCH_SIZE` default 500 -> 2000. Measured through the real server at 500/2000/5000/10000 x 1/4 writers: nothing above 2000 helps; 2000 gives +17-38% on hubs3/hub-fanout, flat on wide, -10% (one run; -2% in another) on unique-dest at 4 writers. One bad message costs 54-736 ms extra; unacked memory <= ~71 MB; the 2 s `bufferTimeout` is unchanged. Tables in `docs/benchmarks/README.md` |
 | E9-10 Vendor-neutral names (part 1) | 2026-11-04: the id and creation-timestamp properties the server writes are config (`ID_PROPERTY`, `CREATED_AT_PROPERTY`; defaults `Uuid` / `CreatedAt`, `none` switches one off, any other value is used as written, so `CREATED_AT_PROPERTY=TheLinkAddedDate` keeps existing graphs working); reserved-property rejection follows the configured names; markers `test_framework` / `benchmark`, neutral sample data, default RabbitMQ credentials `messageserver`; README upgrade note. 5 specs in `ManagedPropertyNamesSpecification`. Also fixed `ApplicationConfigurationSpecification`, which wiped every JVM system property and so hung the Gradle test worker when it failed. Suite 211 tests, 0 failures, 10 skipped |
+| E8-8 Commit history | 2026-11-05: the three oldest local commits, which did not compile alone, are squashed into one (`69be69c`); it and `4e20a01` were built in a clean worktree (`compileGroovy compileTestGroovy`). The cluster work is committed |
 | E4-2 Parallel writers | `WRITER_THREADS` (default 1). Scaling curve 1/2/4/8 writers in `docs/benchmarks/README.md`: unique-dest 3.9x at 8, node-only 2.5x, hubs3 1.5x, hub-fanout 1.3x, wide 1.1x; 0 transient retries. Needed one global lock order (label, then key, both phases: `LockOrder`, ordered statements) after the first version deadlocked (wide 7.8k -> 1.5k msg/s at 2 writers, 70 retries). `SchemaManager` DDL serialised. Real-database specs: 4 writers on heavily shared nodes write everything once with no failures, in both transaction scopes, and a batch delivered twice concurrently changes nothing. **Caveat, by design:** with more than 1 writer two batches carrying the same node can commit in either order (E4-3 fixes this with key-aware routing); default stays 1 |
 
 ## In progress
@@ -138,7 +139,6 @@ laptop; **"faster than anything else" is not yet shown** because the ceiling and
 | E8-4 | Remove unused `lib/*.jar`, stale `micronaut-cli.yml`, update Kubernetes manifest (image, resources, probes, secrets) | P2 | S | |
 | E8-5 | Secrets: no default credentials outside tests; read from env/secret files; fail fast | P1 | S | |
 | E8-6 | Stricter schema: `propertyNames`, scalar-only values for dimensions and properties so bad nested values fail validation instead of at Neo4j | P2 | S | rejected at validation with clear message |
-| E8-8 | Commit history: `6c460b6` and `8b9c136` do not compile alone (`MessageServerCommand.groovy` is committed in `b532ff6` but is needed earlier); local and unpushed. Either squash the first three into one buildable commit or accept it; also commit the 2026-11-02 cluster work | P2 | S | `git bisect` can build every commit on `main`, or the decision is recorded |
 | E8-7 | The dev `docker-compose.yml` `rabbitmq` service failed to start on 2026-11-02 (`.erlang.cookie: eacces`, even on a fresh volume) while a plain `docker run` of the same image worked; find the difference and fix or document | P2 | S | `docker compose up` brings RabbitMQ up |
 
 ### E9 Modeling flexibility

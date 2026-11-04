@@ -63,18 +63,12 @@ A cluster costs a further 16-45% of write throughput (quorum commits): it is for
 6. **Offline bulk path** (E7-1 `neo4j-admin import`) for initial loads: the fastest way to load a large first batch by design, but not a like-for-like comparison with this server.
 
 ## State of the repository
-Four commits on `main`, not pushed (`main` is ahead of `origin/main` by 4): `6c460b6` platform, `8b9c136` core, correctness and
-schema, `b532ff6` pipeline, `0a4548a` benchmark, specs, environments, docs. **`6c460b6` and `8b9c136` do not compile on their
-own** (`MessageServerCommand.groovy` is committed in `b532ff6` but needed earlier); `b532ff6` and HEAD do (E8-8). Squash the
-first three, or accept it.
+Eight commits on `main`, not pushed (`main` is ahead of `origin/main`), working tree clean. The three oldest were squashed on 2026-11-05 into
+`69be69c` because they did not compile alone (E8-8); the others are `4e20a01` benchmark, specs, environments, docs; `2e02f98` cluster validation and
+node-key upgrade; `f571db6` platform upgrade; `18c5784` E10-1 replay; `5789ebd` README and board; `13b10c5` E3-14 matrix; `de3c192` E3-14 default 2000
+and E9-10 part 1. The pre-squash history is on the local branch `backup/pre-squash` (delete it once pushed).
 
-**Uncommitted, 2026-11-02 (afternoon): platform upgrade** (`build.gradle`, `gradle.properties`, Gradle wrapper 9.8.2, `Dockerfile`, `Jenkinsfile`, `.github/workflows/docker-build.yml`, `docs/DEPENDENCIES.md`), **E10-1** (`src/benchmark/.../CeilingRunner.groovy`, `src/test/.../benchmark/CeilingRunnerSpecification.groovy`, the `ceiling` Gradle task, six `docs/benchmarks/2026-11-02-{ceiling,server-java25,server-batch2000}-*.md` reports). **Uncommitted, 2026-11-02 (cluster work):** `docker-compose.cluster.yml` (fixed discovery setting and healthcheck), `SchemaManager`
-(existing-constraint handling, node-key upgrade), `SchemaManagerSpecification` (rewritten, 16 specs), `SchemaConstraintSpecification`
-(+1), new `ClusterSpecification`, new `scripts/cluster-quorum-loss-e2e.sh`, new `docs/CLUSTER.md`, `docs/benchmarks/2026-11-02-*.md`
-(4 reports), and edits to `README.md`, `CLAUDE.md`, `RESUME.md`, `docs/KANBAN.md`, `docs/benchmarks/README.md`. Suggested commit:
-"Validate on a real Neo4j cluster: fix the cluster compose file, make node keys and existing constraints work, add the failover checks".
-
-Suite: **206 tests, 0 failures, 10 skipped** (full run 2026-11-03 on JDK 25, including `CeilingRunnerSpecification`'s 7) (4 need external infrastructure; the rest are the cluster specs, run only with
+Suite: **211 tests, 0 failures, 10 skipped** (full run 2026-11-04 on JDK 25, including `CeilingRunnerSpecification`'s 7) (4 need external infrastructure; the rest are the cluster specs, run only with
 `RUN_CLUSTER_TESTS=Y`). No containers are running.
 
 ## Cluster validation, 2026-11-02 (details and tables: `docs/CLUSTER.md`)
