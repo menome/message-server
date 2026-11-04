@@ -35,22 +35,46 @@ class Neo4JNode {
     private List<Object> cachedIdentity
     private String cachedSignature
 
-    // Property names for the system-managed properties, by CASE_STYLE preference
+    // Property names for the system-managed properties, by CASE_STYLE preference. id and created are the two the server
+    // writes itself on create; ID_PROPERTY and CREATED_AT_PROPERTY override or switch them off (see PreferenceType).
     private static final Map<String, Map<String, String>> CASE_STYLES = [
-            lower: [name: "name", label: "label", uuid: "uuid", added: "thelinkaddeddate", priority: "priority", sourceSystem: "sourcesystem"],
-            camel: [name: "Name", label: "Label", uuid: "Uuid", added: "TheLinkAddedDate", priority: "Priority", sourceSystem: "SourceSystem"],
-            upper: [name: "NAME", label: "LABEL", uuid: "UUID", added: "THELINKADDEDDATE", priority: "PRIORITY", sourceSystem: "SOURCESYSTEM"]
+            lower: [name: "name", label: "label", id: "uuid", created: "createdat", priority: "priority", sourceSystem: "sourcesystem"],
+            camel: [name: "Name", label: "Label", id: "Uuid", created: "CreatedAt", priority: "Priority", sourceSystem: "SourceSystem"],
+            upper: [name: "NAME", label: "LABEL", id: "UUID", created: "CREATEDAT", priority: "PRIORITY", sourceSystem: "SOURCESYSTEM"]
     ]
 
+    private static final String OFF = "none"
+
+    /** The last resolved names with the three settings they came from: reading them happens several times per node. */
+    private static final class Resolved {
+        final String style, id, created
+        final Map<String, String> keys
+        Resolved(String style, String id, String created, Map<String, String> keys) {
+            this.style = style; this.id = id; this.created = created; this.keys = keys
+        }
+    }
+    private static volatile Resolved resolved
+
+    /** Property names the server manages. {@code id} and {@code created} are null when switched off. */
     static Map<String, String> keys() {
-        CASE_STYLES.get(ApplicationConfiguration.getString(PreferenceType.CASE_STYLE).toLowerCase(), CASE_STYLES.camel)
+        String style = ApplicationConfiguration.getString(PreferenceType.CASE_STYLE)
+        String id = ApplicationConfiguration.getString(PreferenceType.ID_PROPERTY)
+        String created = ApplicationConfiguration.getString(PreferenceType.CREATED_AT_PROPERTY)
+        Resolved last = resolved
+        if (last != null && last.style == style && last.id == id && last.created == created) return last.keys
+        Map<String, String> names = new HashMap<>(CASE_STYLES.get(style.toLowerCase(), CASE_STYLES.camel))
+        if (id) names.put("id", id.equalsIgnoreCase(OFF) ? null : id)
+        if (created) names.put("created", created.equalsIgnoreCase(OFF) ? null : created)
+        Map<String, String> result = Collections.unmodifiableMap(names)
+        resolved = new Resolved(style, id, created, result)
+        result
     }
 
     /**
      * A message cannot set the properties the message server manages itself through Properties, DateProperties or
-     * DeleteProperties: Uuid and TheLinkAddedDate are generated, and Name, Label, Priority and SourceSystem come from
+     * DeleteProperties: the id and created-at properties (when enabled) are generated, and Name, Label, Priority and SourceSystem come from
      * the message's own fields when it has them (a connected node has no SourceSystem field, so Properties may carry
-     * it). A dimension may legitimately be called Name, but not Uuid or TheLinkAddedDate.
+     * it). A dimension may legitimately be called Name, but not the id or created-at property.
      *
      * Runs for every node of every message, so it looks each name up once and allocates nothing on the happy path.
      *
@@ -67,7 +91,7 @@ class Neo4JNode {
     private void rejectReserved(String source, Collection<String> names, Map<String, String> k, boolean fieldBackedToo) {
         if (!names) return
         for (String candidate : names) {
-            boolean reserved = candidate == k.uuid || candidate == k.added ||
+            boolean reserved = candidate == k.id || candidate == k.created ||
                     (fieldBackedToo && ((name != null && candidate == k.name) || (label != null && candidate == k.label) ||
                             (priority != null && candidate == k.priority) || (sourceSystem != null && candidate == k.sourceSystem)))
             if (reserved) {
@@ -143,7 +167,10 @@ class Neo4JNode {
     String toMergeCypher() {
         Map<String, String> k = keys()
         StringBuilder cypher = new StringBuilder("MERGE (n:${Cypher.id(nodeType)} {${dimensionMatch()}})")
-        cypher << " ON CREATE SET n.${Cypher.id(k.uuid)} = randomUUID(), n.${Cypher.id(k.added)} = datetime()"
+        List<String> onCreate = []
+        if (k.id != null) onCreate << "n.${Cypher.id(k.id)} = randomUUID()".toString()
+        if (k.created != null) onCreate << "n.${Cypher.id(k.created)} = datetime()".toString()
+        if (onCreate) cypher << " ON CREATE SET " << onCreate.join(", ")
         List<String> sets = propertyValues().keySet().collect { String key -> ("n.${Cypher.id(key)} = ${Cypher.param(key)}").toString() }
         sets.addAll((dateProperties ?: [:]).keySet().sort(false).collect { String key -> ("n.${Cypher.id(key)} = datetime(${Cypher.param(key)})").toString() })
         if (sets) cypher << " SET " << sets.join(", ")

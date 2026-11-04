@@ -173,3 +173,26 @@ on unique-dest, flat on wide, and large on node-only (inflated by a low 500 cell
 (+25% hubs3, +17% hub-fanout) and costs unique-dest 10% (32.2k vs 36.0k), and it is flat or negative on node-only and wide; bigger
 batches are worse there. Latency grows linearly with the batch. Not measured yet: bisect cost with one bad message in 5,000, the
 2-second `bufferTimeout` at low rates, unacked-message memory.
+
+### E3-14 remaining checks, 2026-11-03 (`./gradlew bisect`, `BisectCost`)
+**One bad message in a batch** (a nested object where its siblings have a number, so it shares their statement and only Neo4j
+rejects it; median of 5 repeats, rewriting nodes that exist; the other messages all commit): 
+
+| profile | batch | bytes/msg | clean ms | with 1 bad message ms | extra |
+|---|---|---|---|---|---|
+| node-only | 500 / 2000 / 5000 | 295 | 26 / 41 / 93 | 115 / 140 / 212 | 89 / 99 / 119 ms |
+| hubs3 | 500 / 2000 / 5000 | 815 | 42 / 103 / 224 | 96 / 180 / 366 | 54 / 77 / 142 ms |
+| wide | 500 / 2000 / 5000 | 2,375 | 127 / 451 / 1,093 | 225 / 719 / 1,829 | 98 / 268 / 736 ms |
+
+The bisect grows with the batch but is a fraction of a second to under a second; a batch with one bad message is 1.6-4.4x a clean
+batch. Batches full of bad messages were not measured.
+
+**Unacked-message memory** (RabbitMQ prefetch = batch x (parsers + writers + 1), JSON bytes only; the server holds roughly 3-5x
+that as objects): at batch 2000 wide messages hold 14 MB (1 writer) to 29 MB (4 writers); at 5000, 36 / 71 MB. Not a constraint.
+
+**The 2-second `bufferTimeout`** was not measured, reasoned: a batch is flushed when it is full or 2 s after its first message,
+whichever is first, so a larger batch adds at most that 2 s at low rates and nothing at high rates (it is full in well under 2 s
+above 1,000 msg/s at batch 2000). The 2 s is not changed by the batch size. If latency under 2 s at low rates matters, make the
+timeout configurable (not done).
+
+**Decision:** the default `RABBITMQ_BATCH_SIZE` is now 2000. Above it nothing gained, latency and memory grow linearly.

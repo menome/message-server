@@ -77,7 +77,7 @@ class Neo4J {
         withDriver { Driver driver ->
             driver.session().withCloseable { Session session ->
                 String property = Cypher.id(Neo4JNode.keys().sourceSystem)
-                session.run(Cypher.versioned("MATCH (n) WHERE n.${property} = 'menome_test_framework' CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS")).consume()
+                session.run(Cypher.versioned("MATCH (n) WHERE n.${property} = 'test_framework' CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS")).consume()
             }
         }
     }

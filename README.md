@@ -9,7 +9,7 @@ This project reads messages in a specific structure from a RabbitMQ queue and co
     "Priority": 1,
     "SourceSystem": "HRSystem",
     "ConformedDimensions": {
-      "Email": "konrad.aust@menome.com",
+      "Email": "konrad.aust@example.com",
       "EmployeeId": 12345
     },
     "Properties": {
@@ -19,7 +19,7 @@ This project reads messages in a specific structure from a RabbitMQ queue and co
     },
     "Connections": [
       {
-        "Name": "Menome Victoria",
+        "Name": "Victoria Office",
         "NodeType": "Office",
         "RelType": "LocatedInOffice",
         "ForwardRel": true,
@@ -28,7 +28,7 @@ This project reads messages in a specific structure from a RabbitMQ queue and co
         }
       },
       {
-        "Name": "theLink",
+        "Name": "Apollo",
         "NodeType": "Project",
         "RelType": "WorkedOnProject",
         "ForwardRel": true,
@@ -37,7 +37,7 @@ This project reads messages in a specific structure from a RabbitMQ queue and co
         }
       },
       {
-        "Name": "theLink Product Team",
+        "Name": "Apollo Product Team",
         "NodeType": "Team",
         "Label": "Facet",
         "RelType": "HAS_FACET",
@@ -57,7 +57,7 @@ CREATE CONSTRAINT IF NOT EXISTS FOR (n:`Employee`) REQUIRE (n.`Email`, n.`Employ
 
 UNWIND $parms AS param
 MERGE (n:`Employee` {`Email`: param.`Email`, `EmployeeId`: param.`EmployeeId`})
-ON CREATE SET n.`Uuid` = randomUUID(), n.`TheLinkAddedDate` = datetime()
+ON CREATE SET n.`Uuid` = randomUUID(), n.`CreatedAt` = datetime()
 SET n.`Name` = param.`Name`, n.`PreferredName` = param.`PreferredName`, n.`Priority` = param.`Priority`, ...
 
 UNWIND $parms AS param
@@ -75,7 +75,7 @@ Resulting Graph
 
 ## Objectives
 The primary objective of this project is to update the graph as fast as possible. 
-- Messages are streamed off of the Rabbit queue into batches. The batch size defaults to 500 but can be configured (see Environment/Configuration Variables below.) 
+- Messages are streamed off of the Rabbit queue into batches. The batch size defaults to 2000 (it was 500; see the Performance section) but can be configured (see Environment/Configuration Variables below.) 
 - The next batch is parsed while the previous one is written (a pipeline), and `WRITER_THREADS` can write several batches at once.
 - Planned work is on the board in `docs/KANBAN.md`; the analysis behind it is in `docs/THROUGHPUT.md`.
 
@@ -99,8 +99,8 @@ What to take from it, and what not to:
 - Messages that all point at the same few nodes (hubs) saturate near 38k (hubs3), 45k (hub-fanout) and 8k (wide) msg/s however
   many writers or sessions there are: a relationship write-locks both ends. More writers only help workloads that do not share nodes.
 - `BATCH_SIZE` 2000 instead of 500 gave +16% to +46% on node-only, hubs3 and hub-fanout and nothing on wide and unique-dest, at
-  the cost of up to about 5x the p99 batch time. This is a single run per cell and under 5% is noise. The default stays 500
-  until KANBAN E3-14 has checked it further.
+  the cost of up to about 5x the p99 batch time. This is a single run per cell and under 5% is noise. The default is now 2000 (KANBAN E3-14);
+  a bad message in a batch costs 54-736 ms extra, and the unacked-message memory stays under about 75 MB (`docs/benchmarks/README.md`).
 - These are single-instance Community numbers on one laptop-class Docker host. A 3-member cluster costs 16-45% of write
   throughput (`docs/CLUSTER.md`). They say nothing yet about Kafka or Spark connectors, server-class hardware, or the path through
   RabbitMQ at scale (KANBAN E10-2 to E10-4). **No claim is made that this is faster than any other tool.**
@@ -250,8 +250,8 @@ In the root directory of the project there is a Dockerfile. It can be used to bu
 
 ```shell script
 ./gradlew clean assemble shadowJar
-docker build -t menome/message-server:v1 .
-docker run -p 8080:8080 -e RABBITMQ_HOST=<RABBITMQ_HOST_IP_ADDRESS> -e NEO4J_HOST=<NEO4J_HOST_IP_ADDRESS> menome/message-server-1.0:latest
+docker build -t message-server:v1 .
+docker run -p 8080:8080 -e RABBITMQ_HOST=<RABBITMQ_HOST_IP_ADDRESS> -e NEO4J_HOST=<NEO4J_HOST_IP_ADDRESS> message-server:v1
 ```
    
 
@@ -262,12 +262,12 @@ These are the environment variables that are used by the message server to confi
 |---                        |---------------|
 |RABBITMQ_HOST              | localhost     |
 |RABBITMQ_PORT              | 5672          |
-|RABBITMQ_USER              | menome        |
-|RABBITMQ_PASSWORD          | menome        |
+|RABBITMQ_USER              | messageserver |
+|RABBITMQ_PASSWORD          | messageserver |
 |RABBITMQ_QUEUE             | test_queue    |
 |RABBITMQ_ERROR_QUEUE       | <queue>.errors|
 |RABBITMQ_EXCHANGE_TYPE     | direct        |
-|RABBITMQ_BATCH_SIZE        | 500           |
+|RABBITMQ_BATCH_SIZE        | 2000          |
 |RABBITMQ_EXCHANGE          | test_exchange |
 |                           |               |
 |NEO4J_HOST                 | localhost     |
@@ -280,7 +280,9 @@ These are the environment variables that are used by the message server to confi
 |                           |               |
 |ENABLE_METRICS             | N             |
 |ENABLE_TEST_ENDPOINTS      | N             |
-|CASE_STYLE                 | camel         | (camel, lower or upper: names of Name, Uuid, TheLinkAddedDate, ...)
+|CASE_STYLE                 | camel         | (camel, lower or upper: names of Name, Uuid, CreatedAt, ...)
+|ID_PROPERTY                | (blank)       | (name of the id the server generates on create; blank: Uuid, per CASE_STYLE; `none` leaves it off)
+|CREATED_AT_PROPERTY        | (blank)       | (name of the creation timestamp; blank: CreatedAt, per CASE_STYLE; `none` leaves it off; the old name is `TheLinkAddedDate`)
 |WRITER_THREADS             | 1             | (threads writing batches to Neo4j at the same time; 1 keeps batches in arrival order; see Upgrade notes)
 |PARSER_THREADS             | 1             | (threads parsing the next batches while the writers write; 1 is enough for 2 writers, use 2 for 4 or more)
 |RELATIONSHIP_TRANSACTIONS  | phase         | (phase: one transaction for all relationship statements of a batch; statement: one per statement, shorter locks on shared nodes, more commits)
@@ -311,12 +313,12 @@ message-server-message-server-1  | 21:57:12.925 [main] INFO  com.menome.MessageS
 message-server-message-server-1  | 21:57:12.980 [main] INFO  com.menome.MessageServerCommand - Server Started
 rabbitmq                         | 2022-11-11 21:57:12.983739+00:00 [info] <0.666.0> accepting AMQP connection <0.666.0> (172.19.0.2:48494 -> 172.19.0.3:5672)
 rabbitmq                         | 2022-11-11 21:57:12.985168+00:00 [info] <0.666.0> connection <0.666.0> (172.19.0.2:48494 -> 172.19.0.3:5672) has a client-provided name: test_queue
-rabbitmq                         | 2022-11-11 21:57:12.985862+00:00 [info] <0.666.0> connection <0.666.0> (172.19.0.2:48494 -> 172.19.0.3:5672 - test_queue): user 'menome' authenticated and granted access to vhost '/'
+rabbitmq                         | 2022-11-11 21:57:12.985862+00:00 [info] <0.666.0> connection <0.666.0> (172.19.0.2:48494 -> 172.19.0.3:5672 - test_queue): user 'messageserver' authenticated and granted access to vhost '/'
 message-server-message-server-1  | 21:57:12.988 [rabbitmq-receiver-connection-subscription-1] INFO  reactor.rabbitmq.Receiver - Consumer amq.ctag-qg04yer_kXEnkxXVIKVVcA consuming from test_queue has been registered
 neo4j                            | 2022-11-11 21:57:13.241+0000 INFO  Remote interface available at http://0.0.0.0:7474/
 message-server-message-server-1  | 21:58:28.201 [default-nioEventLoopGroup-1-2] INFO  com.menome.util.RabbitMQ - Connecting to RabbitMQ server rabbitmq on port 5672 with user menome
 rabbitmq                         | 2022-11-11 21:58:28.203885+00:00 [info] <0.679.0> accepting AMQP connection <0.679.0> (172.19.0.2:33176 -> 172.19.0.3:5672)
-rabbitmq                         | 2022-11-11 21:58:28.206556+00:00 [info] <0.679.0> connection <0.679.0> (172.19.0.2:33176 -> 172.19.0.3:5672): user 'menome' authenticated and granted access to vhost '/'
+rabbitmq                         | 2022-11-11 21:58:28.206556+00:00 [info] <0.679.0> connection <0.679.0> (172.19.0.2:33176 -> 172.19.0.3:5672): user 'messageserver' authenticated and granted access to vhost '/'
 ```
 
 See the docker-compose.yml file for the specific ports/user ids and passwords used to provision the containers. 
@@ -346,7 +348,7 @@ The following is provided as an illustration of getting the message server up an
   # open docker-compose.yml in an editor (nano, vim, emacs whatever) and replace contents with docker-compose.yml contents in this repository 
   
   docker login
-  # your docker hub login must have access to the menome repository in order to pull the menome/message-server:latest image 
+  # build the image first (see Building a Docker Image), or pull it from your own registry 
   
   docker compose up
   
@@ -388,11 +390,11 @@ For example:
 curl -X POST http://localhost:8081/DeleteTestMessages
 ```
 
-Will delete all nodes from Neo4J that have a node with a property of SourceSystem with a value of menome_test_framework 
+Will delete all nodes from Neo4J that have a node with a property of SourceSystem with a value of test_framework 
 
 The code behind this endpoint is the equivalent of executing this cypher statement:
  
-```match (n) where n.SourceSystem='menome_test_framework' detach delete n```
+```match (n) where n.SourceSystem='test_framework' detach delete n```
 
 
 ## Upgrade notes
@@ -402,12 +404,13 @@ The code behind this endpoint is the equivalent of executing this cypher stateme
 - Supported message features: `DateProperties` (ISO-8601 -> `datetime`), `Label` (stored as a property), `DeleteProperties`, `DeleteNode`, and on connections `DeleteRelationship`, `DeleteRelProps`, `DeleteNode`.
 - Whole numbers are stored as integers (previously doubles).
 - Test endpoints are POST and disabled by default. Redis is no longer used.
-- `CASE_STYLE=lower` now means entirely lowercase (`thelinkaddeddate`).
-- A message that sets `Uuid`, `TheLinkAddedDate` (or its own Name/Label/Priority/SourceSystem again) in `Properties`, `DateProperties`, `DeleteProperties` or `ConformedDimensions` is rejected as a bad message (error queue) instead of overwriting the managed property.
+- `CASE_STYLE=lower` now means entirely lowercase (`createdat`).
+- A message that sets `Uuid`, `CreatedAt` (or its own Name/Label/Priority/SourceSystem again) in `Properties`, `DateProperties`, `DeleteProperties` or `ConformedDimensions` is rejected as a bad message (error queue) instead of overwriting the managed property.
 - Only statement/schema errors are treated as bad data. Cluster errors (for example `NotALeader` during a failover) and anything unclassified requeue the batch instead of moving messages to `<queue>.errors`. Use a `neo4j://` host (`NEO4J_HOST=neo4j://...`) against a cluster so writes are routed to the leader.
 - Each node type now gets a **uniqueness constraint** on its dimension keys instead of a plain index (`KEY_CONSTRAINT`). Concurrent writers can no longer create duplicate nodes. On first use of a node type an index from an earlier version is dropped and replaced by the constraint (it brings its own index). If the graph already contains duplicate nodes the constraint cannot be created: the message server logs an ERROR with a query that finds the duplicates, keeps using a plain index, and runs without the guarantee until the duplicates are fixed and it is restarted. The constraint costs a little on every node create (up to about 10% throughput on workloads that mostly create new nodes, see `docs/benchmarks/`). A constraint violation is a bad-data error: the message goes to the error queue. Needs permission to create constraints.
 - The next batch is now parsed while the previous one is being written (a pipeline), which raised throughput by 14-37% in the benchmark with no change in behaviour. `WRITER_THREADS` above 1 writes several batches at once and scaled up to 3.9x on messages that do not share nodes, but **two batches that carry the same node can then commit in either order**, so the node keeps the properties of whichever committed last (with 1 writer the last message wins, as before). Messages that all point at the same few nodes (hubs) gain little from more writers because a relationship write-locks both ends. Statements and rows are sent in one global order (label, then key) so writers do not deadlock each other. RabbitMQ prefetch is now `batch size x (parsers + writers + 1)`.
 - **Clusters:** use a routing host (`NEO4J_HOST=neo4j://<host>`) so writes go to the leader. Verified against a 3-primary Enterprise cluster (`docs/CLUSTER.md`): a failover (graceful or hard) loses nothing, a write sent to a follower or while there is no quorum is requeued rather than dead-lettered, and 200,000 messages survived a 55 s quorum loss with every node exactly once. A cluster costs 16-45% of write throughput against a single instance with the same resources. `KEY_CONSTRAINT=nodekey` (Enterprise) now also upgrades an existing uniqueness constraint to a node key; Neo4j cannot hold both on the same keys.
+- **Names are configuration, not hard-coded (E9-10).** The server writes two properties when it creates a node: an id (`randomUUID()`) and a creation timestamp (`datetime()`). They are now `Uuid` and `CreatedAt` by default (`CASE_STYLE` applies), set with `ID_PROPERTY` and `CREATED_AT_PROPERTY`, and either is left off with the value `none`. **Existing graphs written by earlier versions carry `TheLinkAddedDate`: set `CREATED_AT_PROPERTY=TheLinkAddedDate` (and `ID_PROPERTY=Uuid`, the same as the default) to keep writing and protecting that name.** The default test and benchmark markers are now `test_framework` and `benchmark` (were `menome_test_framework`, `menome_benchmark`), the default RabbitMQ user and password are `messageserver` (were `menome`), and the sample data uses neutral names. The message format (`NodeType`, `ConformedDimensions`, `RelType`, ...) is unchanged.
 - A batch commits in at most 3 write transactions (nodes, relationships, node deletes) instead of one per statement.
 
 ## Documentation

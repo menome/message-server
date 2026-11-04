@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicLong
  *
  *   ./gradlew ceiling --args="--container=neo4j-bench --messages=150000 --sessions=1,4,8 --batches=500,2000 --out=docs/benchmarks"
  *
- * Deletes everything tagged SourceSystem=menome_benchmark before and after each run: use a disposable database.
+ * Deletes everything tagged SourceSystem=benchmark before and after each run: use a disposable database.
  * The graph it writes is checked against the server's: first on a sample by content fingerprint, then on every run by
  * node and relationship counts.
  */
@@ -360,7 +360,7 @@ class CeilingRunner {
 
     /**
      * Writes `verifyMessages` messages through the real server code and again through the replay, and compares a
-     * fingerprint of every tagged node (label, properties except the generated Uuid and TheLinkAddedDate) and relationship.
+     * fingerprint of every tagged node (label, properties except the generated id and created-at properties) and relationship.
      */
     static boolean verifyAgainstServer(String profile, Options options, Driver driver) {
         Workload sample = Workloads.build(profile, options.verifyMessages, options.seed + 7)
@@ -386,19 +386,20 @@ class CeilingRunner {
         viaServer == viaReplay
     }
 
-    private static final Set<String> GENERATED = ["Uuid", "TheLinkAddedDate"] as Set
+    /** The properties the server generates on create (names are configuration), which differ between two writes of the same graph. */
+    private static Set<String> generated() { [Neo4JNode.keys().id, Neo4JNode.keys().created].findAll { it != null } as Set }
 
     static String fingerprint(Driver driver) {
         List<String> lines = []
         driver.session().withCloseable { Session session ->
             session.run("MATCH (n) WHERE n.${Cypher.id(Neo4JNode.keys().sourceSystem)} = \$s RETURN labels(n) AS l, properties(n) AS p", [s: Workloads.SOURCE_SYSTEM]).each { r ->
                 Map props = new TreeMap(r.get("p").asMap())
-                GENERATED.each { props.remove(it) }
+                generated().each { props.remove(it) }
                 lines << ("N " + r.get("l").asList().sort() + " " + props).toString()
             }
             session.run("MATCH (a)-[r]->(b) WHERE a.${Cypher.id(Neo4JNode.keys().sourceSystem)} = \$s RETURN labels(a) AS al, properties(a) AS ap, type(r) AS t, properties(r) AS rp, labels(b) AS bl, properties(b) AS bp", [s: Workloads.SOURCE_SYSTEM]).each { r ->
                 Map a = new TreeMap(r.get("ap").asMap()); Map b = new TreeMap(r.get("bp").asMap()); Map rel = new TreeMap(r.get("rp").asMap())
-                [a, b, rel].each { Map m -> GENERATED.each { m.remove(it) } }
+                [a, b, rel].each { Map m -> generated().each { m.remove(it) } }
                 lines << ("R " + r.get("al").asList().sort() + " " + a + " -[" + r.get("t").asString() + " " + rel + "]-> " + r.get("bl").asList().sort() + " " + b).toString()
             }
         }
@@ -435,7 +436,7 @@ class CeilingRunner {
         sb << "\n## What this measures\n\n"
         sb << "The server's own statements and rows, in the server's lock order, replayed by N raw driver sessions (one `executeWrite` per phase) from batches that were parsed, grouped, ordered and parameterised beforehand. "
         sb << "Only the database work is timed: no parsing, no pipeline, no stage timing, no failure handling, no RabbitMQ. It is the most this database takes for this write shape on this hardware; `server % of ceiling` is how much of it the message server uses.\n"
-        sb << "\n## Graph equality with the server\n\n| Profile | same nodes and relationships as the server wrote (SHA-256 of label+properties of every tagged node and relationship, `Uuid`/`TheLinkAddedDate` excluded) |\n|---|---|\n"
+        sb << "\n## Graph equality with the server\n\n| Profile | same nodes and relationships as the server wrote (SHA-256 of label+properties of every tagged node and relationship, `Uuid`/`CreatedAt` excluded) |\n|---|---|\n"
         equal.each { String profile, Boolean same -> sb << "| ${profile} | ${same ? 'yes' : '**NO**'} (${options.verifyMessages} messages) |\n" }
         if (comparison) {
             sb << "\n## The server against its ceiling (interleaved, ${options.repeats} repeats, batch ${options.batches.first()})\n\n"

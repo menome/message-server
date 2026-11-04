@@ -46,7 +46,7 @@ current state.
 - A batch is written in at most 3 write transactions (all node merges, all relationship statements, all node deletes),
   not one per signature. On a data error the phase rolls back and is re-run one statement at a time, then bisected
   (`executePhase`). Keep statement order inside a phase (merges before deletes).
-- Messages may not set the properties the server manages: `Uuid`, `TheLinkAddedDate`, and Name/Label/Priority/SourceSystem
+- Messages may not set the properties the server manages: the id and created-at properties (`Uuid`/`CreatedAt` by default; names are config: `ID_PROPERTY`, `CREATED_AT_PROPERTY`, `none` = off; `TheLinkAddedDate` is the legacy name), and Name/Label/Priority/SourceSystem
   when the message has that field itself (`Neo4JNode.assertNoReservedProperties`). `SourceSystem` in a connection's
   `Properties` is legitimate (a connected node has no such field).
 - `Neo4JNode`/`Neo4JConnection` cache `signature()`, `identity()` and `dimensionKeys()`: never change a node after it has
@@ -81,6 +81,6 @@ current state.
 
 ## Config (env vars)
 RABBITMQ_HOST/PORT/USER/PASSWORD/QUEUE/ERROR_QUEUE/EXCHANGE/EXCHANGE_TYPE/ROUTE/BATCH_SIZE, NEO4J_HOST/BOLT_PORT/USER/PASSWORD,
-KEY_CONSTRAINT (unique|nodekey|index), WRITER_THREADS, PARSER_THREADS, RELATIONSHIP_TRANSACTIONS (phase|statement),
+KEY_CONSTRAINT (unique|nodekey|index), ID_PROPERTY, CREATED_AT_PROPERTY, WRITER_THREADS, PARSER_THREADS, RELATIONSHIP_TRANSACTIONS (phase|statement),
 HTTP_SERVER_PORT, ENABLE_METRICS (Y), ENABLE_TEST_ENDPOINTS (Y), CASE_STYLE (camel|lower|upper),
 SHOW_CONNECTION_LOG_OUTPUT, RUN_WITH_TEST_CONTAINERS. Defaults in `util/PreferenceType.groovy`.

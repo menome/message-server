@@ -37,15 +37,15 @@ class GenerateTestMessagesController {
         String route = ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE)
         def channel = RabbitMQ.openRabbitMQChannel(ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE), exchange, route, RabbitMQ.createRabbitConnectionFactory())
         try {
-            def victoriaOffice = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).Properties(["SourceSystem": "menome_test_framework"]).build()
-            def project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).Properties(["SourceSystem": "menome_test_framework"]).build()
-            def team = Connection.builder().Name("theLink Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).Properties(["SourceSystem": "menome_test_framework"]).build()
+            def victoriaOffice = Connection.builder().Name("Victoria Office").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).Properties(["SourceSystem": "test_framework"]).build()
+            def project = Connection.builder().Name("Apollo").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).Properties(["SourceSystem": "test_framework"]).build()
+            def team = Connection.builder().Name("Apollo Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).Properties(["SourceSystem": "test_framework"]).build()
             def victoriaEmployee = MessageBuilder.builder()
                     .Name("Konrad Aust")
                     .NodeType("Employee")
                     .Priority(1)
-                    .SourceSystem("menome_test_framework")
-                    .ConformedDimensions("Email": "konrad.aust@menome.com", "EmployeeId": 12345)
+                    .SourceSystem("test_framework")
+                    .ConformedDimensions("Email": "konrad.aust@example.com", "EmployeeId": 12345)
                     .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
                     .Connections([victoriaOffice, project, team])
                     .build()
@@ -53,7 +53,7 @@ class GenerateTestMessagesController {
 
             log.info("Creating ${messagesToCreate} test messages")
             (1..messagesToCreate).each {
-                String message = victoriaEmployee.replaceAll("konrad.aust@menome.com", "konrad.aust${UUID.randomUUID()}@menome.com")
+                String message = victoriaEmployee.replaceAll("konrad.aust@example.com", "konrad.aust${UUID.randomUUID()}@example.com")
                 channel.basicPublish(exchange, route, null, message.getBytes())
             }
             log.info("Done")

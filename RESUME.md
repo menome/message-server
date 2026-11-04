@@ -122,3 +122,9 @@ Suite: **206 tests, 0 failures, 10 skipped** (full run 2026-11-03 on JDK 25, inc
 ./gradlew test                                                                  # ~3 min, needs Docker
 RUN_CLUSTER_TESTS=Y ./gradlew test --tests '*ClusterSpecification'              # ~2.5 min, needs the cluster up
 ```
+
+## 2026-11-04 update
+- E3-14 done: `RABBITMQ_BATCH_SIZE` default is now 2000 (`docs/benchmarks/README.md`, "Batch size through the real server" and "remaining checks").
+- E9-10 part 1 done: `ID_PROPERTY` / `CREATED_AT_PROPERTY` are config; old graphs: `CREATED_AT_PROPERTY=TheLinkAddedDate`. Part 2 (package name, image name, wire vocabulary) is E9-10b and needs decisions from the owner.
+- Suite: 211 tests, 0 failures, 10 skipped on JDK 25. Gotcha: a spec that wipes JVM system properties (`System.setProperties(new Properties())`) hangs the Gradle test worker when anything fails. Don't.
+- New benchmark tool: `./gradlew bisect` (`BisectCost`): cost of one bad message and message sizes.

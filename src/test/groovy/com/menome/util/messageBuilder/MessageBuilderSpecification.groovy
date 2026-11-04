@@ -50,9 +50,9 @@ class MessageBuilderSpecification extends Specification {
     def "entity with properties and connections"() {
         given:
 
-        def office = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
-        def project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
-        def team = Connection.builder().Name("theLink Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
+        def office = Connection.builder().Name("Victoria Office").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
+        def project = Connection.builder().Name("Apollo").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
+        def team = Connection.builder().Name("Apollo Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
         def message = MessageBuilder.builder()
                 .Name("Todd Costella")
                 .NodeType("Employee")
@@ -64,19 +64,19 @@ class MessageBuilderSpecification extends Specification {
                 .build()
         def json = message.toJSON()
         expect:
-        json == /{"Name":"Todd Costella","NodeType":"Employee","Priority":1,"SourceSystem":"HRSystem","ConformedDimensions":{"Email":"ToddCostella@gmail.com","EmployeeId":12345},"Properties":{"Status":"active","PreferredName":"The Chazzinator","ResumeSkills":"programming,peeling bananas from the wrong end,handstands,sweet kickflips"},"Connections":[{"Name":"Menome Victoria","NodeType":"Office","RelType":"LocatedInOffice","ForwardRel":true,"ConformedDimensions":{"City":"Victoria"}},{"Name":"theLink","NodeType":"Project","RelType":"WorkedOnProject","ForwardRel":true,"ConformedDimensions":{"Code":"5"}},{"Name":"theLink Product Team","NodeType":"Team","Label":"Facet","RelType":"HAS_FACET","ForwardRel":true,"ConformedDimensions":{"Code":"1337"}}]}/
+        json == /{"Name":"Todd Costella","NodeType":"Employee","Priority":1,"SourceSystem":"HRSystem","ConformedDimensions":{"Email":"ToddCostella@gmail.com","EmployeeId":12345},"Properties":{"Status":"active","PreferredName":"The Chazzinator","ResumeSkills":"programming,peeling bananas from the wrong end,handstands,sweet kickflips"},"Connections":[{"Name":"Victoria Office","NodeType":"Office","RelType":"LocatedInOffice","ForwardRel":true,"ConformedDimensions":{"City":"Victoria"}},{"Name":"Apollo","NodeType":"Project","RelType":"WorkedOnProject","ForwardRel":true,"ConformedDimensions":{"Code":"5"}},{"Name":"Apollo Product Team","NodeType":"Team","Label":"Facet","RelType":"HAS_FACET","ForwardRel":true,"ConformedDimensions":{"Code":"1337"}}]}/
     }
 
     def "pretty print comparison against menome github example"(){
-        def office = Connection.builder().Name("Menome Victoria").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
-        def project = Connection.builder().Name("theLink").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
-        def team = Connection.builder().Name("theLink Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
+        def office = Connection.builder().Name("Victoria Office").NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).build()
+        def project = Connection.builder().Name("Apollo").NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).build()
+        def team = Connection.builder().Name("Apollo Product Team").NodeType("Team").Label("Facet").RelType("HAS_FACET").ForewardRel(true).ConformedDimensions(["Code": "1337"]).build()
         def message = MessageBuilder.builder()
                 .Name("Konrad Aust")
                 .NodeType("Employee")
                 .Priority(1)
                 .SourceSystem("HRSystem")
-                .ConformedDimensions(["Email": "konrad.aust@menome.com", "EmployeeId": 12345])
+                .ConformedDimensions(["Email": "konrad.aust@example.com", "EmployeeId": 12345])
                 .Properties(["Status": "active", "PreferredName": "The Chazzinator", "ResumeSkills": "programming,peeling bananas from the wrong end,handstands,sweet kickflips"])
                 .Connections([office, project, team])
                 .build()
@@ -89,7 +89,7 @@ class MessageBuilderSpecification extends Specification {
   "Priority": 1,
   "SourceSystem": "HRSystem",
   "ConformedDimensions": {
-    "Email": "konrad.aust@menome.com",
+    "Email": "konrad.aust@example.com",
     "EmployeeId": 12345
   },
   "Properties": {
@@ -99,7 +99,7 @@ class MessageBuilderSpecification extends Specification {
   },
   "Connections": [
     {
-      "Name": "Menome Victoria",
+      "Name": "Victoria Office",
       "NodeType": "Office",
       "RelType": "LocatedInOffice",
       "ForwardRel": true,
@@ -108,7 +108,7 @@ class MessageBuilderSpecification extends Specification {
       }
     },
     {
-      "Name": "theLink",
+      "Name": "Apollo",
       "NodeType": "Project",
       "RelType": "WorkedOnProject",
       "ForwardRel": true,
@@ -117,7 +117,7 @@ class MessageBuilderSpecification extends Specification {
       }
     },
     {
-      "Name": "theLink Product Team",
+      "Name": "Apollo Product Team",
       "NodeType": "Team",
       "Label": "Facet",
       "RelType": "HAS_FACET",

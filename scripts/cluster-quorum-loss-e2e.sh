@@ -5,7 +5,7 @@
 # finish: every employee exactly once, queue empty, nothing reported as bad data.
 #
 # Needs: the cluster up (docker compose -f docker-compose.cluster.yml up -d --wait), a RabbitMQ container named by
-# $RABBIT (default rmq-probe: docker run -d --name rmq-probe -e RABBITMQ_DEFAULT_USER=menome -e RABBITMQ_DEFAULT_PASS=menome
+# $RABBIT (default rmq-probe: docker run -d --name rmq-probe -e RABBITMQ_DEFAULT_USER=messageserver -e RABBITMQ_DEFAULT_PASS=messageserver
 # -p 5672:5672 rabbitmq:management-alpine), build/libs/messageServer-1.0-all.jar (./gradlew shadowJar), port 8081 free.
 # Usage: scripts/cluster-quorum-loss-e2e.sh [server-log-file]
 # 2026-11-02 result: RESULT: PASS - 200,000 employees (200,000 distinct), 600,000 relationships, 1-2 batches requeued
@@ -22,9 +22,9 @@ docker exec $RABBIT rabbitmqctl purge_queue test_queue >/dev/null 2>&1
 # memory"). Once the employees are gone the hubs are trivial.
 for c in cluster-server1 cluster-server2 cluster-server3; do docker start $c >/dev/null 2>&1; done
 for i in $(seq 1 60); do n=$(any "SHOW DATABASES YIELD name, currentStatus WHERE name='neo4j' AND currentStatus='online' RETURN count(*)" | tail -1); [ "$n" = "3" ] && break; sleep 3; done
-any "MATCH (e:Employee) WHERE e.SourceSystem = 'menome_test_framework' CALL (e) { DETACH DELETE e } IN TRANSACTIONS OF 1000 ROWS" >/dev/null
-any "MATCH (n) WHERE n.SourceSystem = 'menome_test_framework' CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS" >/dev/null
-LEFT=$(any "MATCH (n) WHERE n.SourceSystem = 'menome_test_framework' RETURN count(n)" | tail -1)
+any "MATCH (e:Employee) WHERE e.SourceSystem = 'test_framework' CALL (e) { DETACH DELETE e } IN TRANSACTIONS OF 1000 ROWS" >/dev/null
+any "MATCH (n) WHERE n.SourceSystem = 'test_framework' CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 1000 ROWS" >/dev/null
+LEFT=$(any "MATCH (n) WHERE n.SourceSystem = 'test_framework' RETURN count(n)" | tail -1)
 [ "$LEFT" = "0" ] || { echo "cannot start: $LEFT test nodes left over"; echo "RESULT: FAIL"; echo FINISHED; exit 1; }
 EXPECTED=200000
 (NEO4J_HOST=neo4j://localhost NEO4J_BOLT_PORT=7687 ENABLE_TEST_ENDPOINTS=Y WRITER_THREADS=2 PARSER_THREADS=1 nohup java -jar build/libs/messageServer-1.0-all.jar > $SERVER_LOG 2>&1 &)
@@ -48,7 +48,7 @@ done
 echo "== final"
 for i in $(seq 1 60); do n=$(any "SHOW DATABASES YIELD name, currentStatus WHERE name='neo4j' AND currentStatus='online' RETURN count(*)" | tail -1); [ "$n" = "3" ] && break; sleep 3; done
 echo "members online: $n"
-EMPLOYEES=$(any "MATCH (e:Employee) WHERE e.SourceSystem='menome_test_framework' RETURN count(e), count(DISTINCT e.Email)" | tail -1)
+EMPLOYEES=$(any "MATCH (e:Employee) WHERE e.SourceSystem='test_framework' RETURN count(e), count(DISTINCT e.Email)" | tail -1)
 RELS=$(any "MATCH (:Employee)-[r]->() WHERE r:LocatedInOffice OR r:WorkedOnProject OR r:HAS_FACET RETURN count(r)" | tail -1)
 echo "employees (count, distinct): $EMPLOYEES   relationships: $RELS   (expected $EXPECTED employees, $((EXPECTED*3)) relationships)"
 echo "queues: $(docker exec $RABBIT rabbitmqctl list_queues name messages messages_unacknowledged 2>/dev/null | grep -E '^test_queue' | tr '\t' ' ')"

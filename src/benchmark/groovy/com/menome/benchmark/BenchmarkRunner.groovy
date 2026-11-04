@@ -27,7 +27,7 @@ import java.time.LocalDate
  *
  *   ./gradlew benchmark --args="--profiles=node-only,hubs3 --messages=20000 --batch=500 --warmup=2 --out=docs/benchmarks"
  *
- * It deletes everything tagged SourceSystem=menome_benchmark before and after each profile, so point it at a
+ * It deletes everything tagged SourceSystem=benchmark before and after each profile, so point it at a
  * disposable database.
  */
 class BenchmarkRunner {

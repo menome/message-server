@@ -34,7 +34,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
                     .Name("Collection:+${UUID.randomUUID()}")
                     .NodeType("CollectionEvent")
                     .Priority(1)
-                    .SourceSystem("menome_test_framework")
+                    .SourceSystem("test_framework")
                     .ConformedDimensions("ACCTNUM": random.nextInt(5000), "ENT_SEQ_NO": random.nextInt(5000), "UNIQUE_ID":UUID.randomUUID())
                     .Properties(deriveProperties(primaryNodePropertyCount))
                     .Connections(deriveConnections(connectionCount))
@@ -53,7 +53,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
                     .Name("Account ${accountId}")
                     .NodeType("Account")
                     .Priority(1)
-                    .SourceSystem("menome_test_framework")
+                    .SourceSystem("test_framework")
                     .ConformedDimensions(["ACCTNUM": accountId])
                     .build()
                     .toJSON()
@@ -70,7 +70,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
                     .Name("Activity ${activityCodeId}")
                     .NodeType("CollectionActivity")
                     .Priority(1)
-                    .SourceSystem("menome_test_framework")
+                    .SourceSystem("test_framework")
                     .ConformedDimensions(["COL_ACTIVITY_CODE": activityCodeId])
                     .build()
                     .toJSON()
@@ -86,7 +86,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
                     .Name("Dialer Entry ${accountNum}")
                     .NodeType("DialerEntry")
                     .Priority(1)
-                    .SourceSystem("menome_test_framework")
+                    .SourceSystem("test_framework")
                     .ConformedDimensions(["SNAPSHOT_SDT": accountNum, "ACCTNUM": accountNum])
                     .build()
                     .toJSON()
@@ -163,7 +163,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         List<Connection> connections = []
         (1..count).each {
             def accountId = random.nextInt(count)
-            def account = Connection.builder().Name("Account ${accountId}").NodeType("Account").RelType("COLLECTION_ENTRY_FOR_ACCOUNT").ForewardRel(true).ConformedDimensions(["ACCTNUM": accountId]).Properties(["SourceSystem": "menome_test_framework"]).build()
+            def account = Connection.builder().Name("Account ${accountId}").NodeType("Account").RelType("COLLECTION_ENTRY_FOR_ACCOUNT").ForewardRel(true).ConformedDimensions(["ACCTNUM": accountId]).Properties(["SourceSystem": "test_framework"]).build()
             connections.add(account)
         }
         connections
@@ -174,7 +174,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         List<Connection> connections = []
         (1..count).each {
             def activityCodeId = random.nextInt(count)
-            def activity = Connection.builder().Name("Activity ${activityCodeId}").NodeType("CollectionActivity").RelType("ACTIVITY").ForewardRel(true).ConformedDimensions(["COL_ACTIVITY_CODE": activityCodeId]).Properties(["SourceSystem": "menome_test_framework"]).build()
+            def activity = Connection.builder().Name("Activity ${activityCodeId}").NodeType("CollectionActivity").RelType("ACTIVITY").ForewardRel(true).ConformedDimensions(["COL_ACTIVITY_CODE": activityCodeId]).Properties(["SourceSystem": "test_framework"]).build()
             connections.add(activity)
         }
         connections
@@ -185,7 +185,7 @@ class SymendMessagingSpecification extends MessagingWithTestContainersSpecificat
         List<Connection> connections = []
         (1..count).each {
             def key = random.nextInt(count)
-            def activity = Connection.builder().Name("Dialer Entry ${key}").NodeType("DialerEntry").RelType("COLLECTION").ForewardRel(true).ConformedDimensions(["SNAPSHOT_SDT": key, "ACCTNUM": key]).Properties(["SourceSystem": "menome_test_framework"]).build()
+            def activity = Connection.builder().Name("Dialer Entry ${key}").NodeType("DialerEntry").RelType("COLLECTION").ForewardRel(true).ConformedDimensions(["SNAPSHOT_SDT": key, "ACCTNUM": key]).Properties(["SourceSystem": "test_framework"]).build()
             connections.add(activity)
         }
         connections

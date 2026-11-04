@@ -20,8 +20,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: "menome"
-      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:-menome}"
+      RABBITMQ_DEFAULT_USER: "messageserver"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:-messageserver}"
   message-server:
     build: .
     ports:
@@ -31,7 +31,7 @@ services:
       - neo4j
     environment:
       RABBITMQ_HOST: "rabbitmq"
-      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:-menome}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:-messageserver}"
       NEO4J_HOST: "neo4j"
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-password}"
       ENABLE_TEST_ENDPOINTS: "${ENABLE_TEST_ENDPOINTS:-N}"

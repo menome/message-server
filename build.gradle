@@ -112,8 +112,19 @@ tasks.register('ceiling', JavaExec) {
     outputs.upToDateWhen { false }
 }
 
+// What one bad message costs a batch, and message sizes (KANBAN E3-14)
+tasks.register('bisect', JavaExec) {
+    group = 'verification'
+    description = 'Measures the cost of one bad message per batch size; --args="--profiles=node-only --batches=500,2000 --repeats=5"'
+    classpath = sourceSets.benchmark.runtimeClasspath
+    mainClass = 'com.menome.benchmark.BisectCost'
+    workingDir = projectDir
+    dependsOn classes
+    outputs.upToDateWhen { false }
+}
+
 // The benchmark needs the full JIT, so it is the one JavaExec task that skips these flags
 tasks.withType(JavaExec).configureEach {
-    if (name == 'benchmark' || name == 'ceiling') return
+    if (name == 'benchmark' || name == 'ceiling' || name == 'bisect') return
     jvmArgs('-XX:TieredStopAtLevel=1', '-Dcom.sun.management.jmxremote')
 }

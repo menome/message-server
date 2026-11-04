@@ -11,17 +11,19 @@ class ApplicationConfigurationSpecification extends Specification {
 
     def "test defaults"() {
         given:
-        System.setProperties(new Properties())
+        // Clear only our own settings: wiping every system property breaks the Gradle test worker (a failing assertion
+        // then hangs the worker instead of being reported)
+        PreferenceType.values().each { System.clearProperty(it.name()) }
         expect:
         "neo4j" == ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)
         "localhost" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_HOST)
         5672 == ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_PORT)
-        "menome" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_USER)
-        "menome" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_PASSWORD)
+        "messageserver" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_USER)
+        "messageserver" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_PASSWORD)
         "test_queue" ==ApplicationConfiguration.getString(PreferenceType.RABBITMQ_QUEUE)
         "test_exchange" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_EXCHANGE)
         "test_route" == ApplicationConfiguration.getString(PreferenceType.RABBITMQ_ROUTE)
-        500 == ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCH_SIZE)
+        2000 == ApplicationConfiguration.getInteger(PreferenceType.RABBITMQ_BATCH_SIZE)
         "localhost" == ApplicationConfiguration.getString(PreferenceType.NEO4J_HOST)
         7687 == ApplicationConfiguration.getInteger(PreferenceType.NEO4J_BOLT_PORT)
         "neo4j" == ApplicationConfiguration.getString(PreferenceType.NEO4J_USER)

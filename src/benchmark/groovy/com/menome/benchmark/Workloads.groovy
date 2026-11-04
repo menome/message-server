@@ -9,7 +9,7 @@ import com.menome.util.messageBuilder.MessageBuilder
  */
 class Workloads {
 
-    static final String SOURCE_SYSTEM = "menome_benchmark"
+    static final String SOURCE_SYSTEM = "benchmark"
     static final String PRIMARY_TYPE = "BenchNode"
 
     static final Map<String, String> DESCRIPTIONS = [

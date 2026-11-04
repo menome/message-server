@@ -33,7 +33,7 @@ class ReservedPropertiesSpecification extends Specification {
         e.message.toLowerCase().contains("reserved")
 
         where:
-        property << ["Uuid", "TheLinkAddedDate", "Name", "Priority", "SourceSystem"]
+        property << ["Uuid", "CreatedAt", "Name", "Priority", "SourceSystem"]
     }
 
     def "date properties and property deletion cannot touch the system-managed properties either"() {
@@ -42,11 +42,11 @@ class ReservedPropertiesSpecification extends Specification {
 
         then:
         IllegalArgumentException e = thrown()
-        e.message.contains("TheLinkAddedDate") || e.message.contains("Uuid")
+        e.message.contains("CreatedAt") || e.message.contains("Uuid")
 
         where:
         overrides << [
-                [DateProperties: [TheLinkAddedDate: "2026-01-01T00:00:00Z"]],
+                [DateProperties: [CreatedAt: "2026-01-01T00:00:00Z"]],
                 [DeleteProperties: ["Uuid"]],
                 [ConformedDimensions: [Uuid: "abc"]],
         ]

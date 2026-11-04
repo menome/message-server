@@ -15,10 +15,10 @@ class MessageParserSpecification extends MessagingSpecification {
         Neo4JNode node = nodes[0]
         node.nodeType == "Employee"
         node.priority == 1
-        node.sourceSystem == "menome_test_framework"
+        node.sourceSystem == "test_framework"
         node.name == "Konrad Aust"
         node.conformedDimensions
-        node.conformedDimensions.Email == "konrad.aust@menome.com"
+        node.conformedDimensions.Email == "konrad.aust@example.com"
         node.conformedDimensions.EmployeeId == 12345
     }
 
@@ -68,7 +68,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def merge = node.toCypher()
         expect:
         merge
-        merge == "MERGE (n:`Employee` {`Email`: param.`Email`, `EmployeeId`: param.`EmployeeId`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`TheLinkAddedDate` = datetime() SET n.`Name` = param.`Name`, n.`Priority` = param.`Priority`, n.`SourceSystem` = param.`SourceSystem`"
+        merge == "MERGE (n:`Employee` {`Email`: param.`Email`, `EmployeeId`: param.`EmployeeId`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`CreatedAt` = datetime() SET n.`Name` = param.`Name`, n.`Priority` = param.`Priority`, n.`SourceSystem` = param.`SourceSystem`"
 
     }
 
@@ -78,7 +78,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def employeeMerge = employeeNode.toCypher()
         expect:
         employeeMerge
-        employeeMerge == "MERGE (n:`Employee` {`Email`: param.`Email`, `EmployeeId`: param.`EmployeeId`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`TheLinkAddedDate` = datetime() SET n.`Name` = param.`Name`, n.`PreferredName` = param.`PreferredName`, n.`Priority` = param.`Priority`, n.`ResumeSkills` = param.`ResumeSkills`, n.`SourceSystem` = param.`SourceSystem`, n.`Status` = param.`Status`"
+        employeeMerge == "MERGE (n:`Employee` {`Email`: param.`Email`, `EmployeeId`: param.`EmployeeId`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`CreatedAt` = datetime() SET n.`Name` = param.`Name`, n.`PreferredName` = param.`PreferredName`, n.`Priority` = param.`Priority`, n.`ResumeSkills` = param.`ResumeSkills`, n.`SourceSystem` = param.`SourceSystem`, n.`Status` = param.`Status`"
     }
 
     def "Merge statement from project connection"() {
@@ -87,7 +87,7 @@ class MessageParserSpecification extends MessagingSpecification {
         def projectMerge = projectNode.toCypher()
         expect:
         projectMerge
-        projectMerge == "MERGE (n:`Project` {`Code`: param.`Code`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`TheLinkAddedDate` = datetime() SET n.`Name` = param.`Name`, n.`SourceSystem` = param.`SourceSystem`"
+        projectMerge == "MERGE (n:`Project` {`Code`: param.`Code`}) ON CREATE SET n.`Uuid` = randomUUID(), n.`CreatedAt` = datetime() SET n.`Name` = param.`Name`, n.`SourceSystem` = param.`SourceSystem`"
     }
 
     def "Merge connection statement from employee node"() {

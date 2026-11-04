@@ -124,8 +124,8 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
     def "nodes of one type with different property sets keep all their properties"() {
         given:
         Driver driver = Neo4J.openDriver()
-        def withNickname = MessageBuilder.builder().NodeType("Person").SourceSystem("menome_test_framework").ConformedDimensions("Id": 1).Properties(["Nickname": "Bob"]).build().toJSON()
-        def withAge = MessageBuilder.builder().NodeType("Person").SourceSystem("menome_test_framework").ConformedDimensions("Id": 2).Properties(["Age": 42]).build().toJSON()
+        def withNickname = MessageBuilder.builder().NodeType("Person").SourceSystem("test_framework").ConformedDimensions("Id": 1).Properties(["Nickname": "Bob"]).build().toJSON()
+        def withAge = MessageBuilder.builder().NodeType("Person").SourceSystem("test_framework").ConformedDimensions("Id": 2).Properties(["Age": 42]).build().toJSON()
         when:
         MessageBatchProcessor.process([withNickname, withAge], driver)
         then:
@@ -150,8 +150,8 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
     def "the last message for a node in a batch wins"() {
         given:
         Driver driver = Neo4J.openDriver()
-        def first = MessageBuilder.builder().NodeType("Person").SourceSystem("menome_test_framework").ConformedDimensions("Id": 1).Properties(["Status": "old"]).build().toJSON()
-        def last = MessageBuilder.builder().NodeType("Person").SourceSystem("menome_test_framework").ConformedDimensions("Id": 1).Properties(["Status": "new"]).build().toJSON()
+        def first = MessageBuilder.builder().NodeType("Person").SourceSystem("test_framework").ConformedDimensions("Id": 1).Properties(["Status": "old"]).build().toJSON()
+        def last = MessageBuilder.builder().NodeType("Person").SourceSystem("test_framework").ConformedDimensions("Id": 1).Properties(["Status": "new"]).build().toJSON()
         when:
         MessageBatchProcessor.process([first, last], driver)
         then:
@@ -163,8 +163,8 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
     def "relationships keep their own direction within one batch"() {
         given:
         Driver driver = Neo4J.openDriver()
-        def forward = Connection.builder().NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).Properties(["SourceSystem": "menome_test_framework"]).build()
-        def reverse = Connection.builder().NodeType("Office").RelType("LocatedInOffice").ForewardRel(false).ConformedDimensions(["City": "Calgary"]).Properties(["SourceSystem": "menome_test_framework"]).build()
+        def forward = Connection.builder().NodeType("Office").RelType("LocatedInOffice").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).Properties(["SourceSystem": "test_framework"]).build()
+        def reverse = Connection.builder().NodeType("Office").RelType("LocatedInOffice").ForewardRel(false).ConformedDimensions(["City": "Calgary"]).Properties(["SourceSystem": "test_framework"]).build()
         def one = buildEmployeeMessage(true, forward)
         def two = buildEmployeeMessage(true, reverse)
         when:
@@ -195,11 +195,11 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
     def "relationship properties, date properties and property deletion are applied"() {
         given:
         Driver driver = Neo4J.openDriver()
-        def create = MessageBuilder.builder().NodeType("Person").SourceSystem("menome_test_framework").ConformedDimensions("Id": 1)
+        def create = MessageBuilder.builder().NodeType("Person").SourceSystem("test_framework").ConformedDimensions("Id": 1)
                 .Properties(["Nickname": "Bob", "Age": 42]).DateProperties(["Born": "1980-01-02T03:04:05Z"])
-                .Connections([Connection.builder().NodeType("Office").RelType("WORKS_IN").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).RelProps(["Role": "boss"]).DateRelProps(["Since": "2020-01-01T00:00:00Z"]).Properties(["SourceSystem": "menome_test_framework"]).build()])
+                .Connections([Connection.builder().NodeType("Office").RelType("WORKS_IN").ForewardRel(true).ConformedDimensions(["City": "Victoria"]).RelProps(["Role": "boss"]).DateRelProps(["Since": "2020-01-01T00:00:00Z"]).Properties(["SourceSystem": "test_framework"]).build()])
                 .build().toJSON()
-        def update = MessageBuilder.builder().NodeType("Person").SourceSystem("menome_test_framework").ConformedDimensions("Id": 1).DeleteProperties(["Age"]).build().toJSON()
+        def update = MessageBuilder.builder().NodeType("Person").SourceSystem("test_framework").ConformedDimensions("Id": 1).DeleteProperties(["Age"]).build().toJSON()
         when:
         MessageBatchProcessor.process([create], driver)
         MessageBatchProcessor.process([update], driver)
@@ -219,9 +219,9 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
         given:
         Driver driver = Neo4J.openDriver()
         MessageBatchProcessor.process([buildVictoriaEmployeeMessage(false)], driver)
-        def unlink = MessageBuilder.builder().NodeType("Employee").SourceSystem("menome_test_framework").ConformedDimensions("Email": "konrad.aust@menome.com", "EmployeeId": 12345)
+        def unlink = MessageBuilder.builder().NodeType("Employee").SourceSystem("test_framework").ConformedDimensions("Email": "konrad.aust@example.com", "EmployeeId": 12345)
                 .Connections([Connection.builder().NodeType("Project").RelType("WorkedOnProject").ForewardRel(true).ConformedDimensions(["Code": "5"]).DeleteRelationship(true).build()]).build().toJSON()
-        def deleteTeam = MessageBuilder.builder().NodeType("Team").SourceSystem("menome_test_framework").ConformedDimensions("Code": "1337").DeleteNode(true).build().toJSON()
+        def deleteTeam = MessageBuilder.builder().NodeType("Team").SourceSystem("test_framework").ConformedDimensions("Code": "1337").DeleteNode(true).build().toJSON()
         when:
         MessageBatchProcessor.process([unlink, deleteTeam], driver)
         then:
@@ -250,8 +250,8 @@ class MessageBatchProcessorSpecification extends MessagingWithTestContainersSpec
     def "a property key cannot inject cypher"() {
         given:
         Driver driver = Neo4J.openDriver()
-        def survivor = MessageBuilder.builder().NodeType("Person").SourceSystem("menome_test_framework").ConformedDimensions("Id": 99).build().toJSON()
-        def evil = MessageBuilder.builder().NodeType("Person").SourceSystem("menome_test_framework").ConformedDimensions("Id": 1)
+        def survivor = MessageBuilder.builder().NodeType("Person").SourceSystem("test_framework").ConformedDimensions("Id": 99).build().toJSON()
+        def evil = MessageBuilder.builder().NodeType("Person").SourceSystem("test_framework").ConformedDimensions("Id": 1)
                 .Properties(["x = 1 WITH n MATCH (m) DETACH DELETE m //": "boom"]).build().toJSON()
         when:
         MessageBatchProcessor.process([survivor], driver)
