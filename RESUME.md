@@ -1,11 +1,11 @@
 # RESUME - where this project stands
 
-Last updated: 2026-11-02 (end of day: platform upgrade done, E10-1 in progress). Read this first when picking the work back up.
+Last updated: 2026-11-09 (everything pushed; see "2026-11-09 update" at the end). Read this first when picking the work back up.
 
 ## The goal
 Take the original Menome data atomization pattern (harvesters emit atomised JSON messages; the refinery, this message
 server, merges them into a knowledge graph, continuously) to current code and methods, then optimise ingestion to the limit,
-ideally beyond anything else available. Three pillars, scored below. Planned work: `docs/KANBAN.md` (32 done, 53 in Backlog, E10-1 in progress).
+ideally beyond anything else available. Three pillars, scored below. Planned work: `docs/KANBAN.md`.
 
 ## Scorecard (honest)
 | Pillar | Status | Evidence | What is missing |
@@ -63,10 +63,10 @@ A cluster costs a further 16-45% of write throughput (quorum commits): it is for
 6. **Offline bulk path** (E7-1 `neo4j-admin import`) for initial loads: the fastest way to load a large first batch by design, but not a like-for-like comparison with this server.
 
 ## State of the repository
-Eight commits on `main`, not pushed (`main` is ahead of `origin/main`), working tree clean. The three oldest were squashed on 2026-11-05 into
+All commits are pushed to `origin/main` (github.com/menome/message-server) as of 2026-11-09, working tree clean. The three oldest were squashed on 2026-11-05 into
 `69be69c` because they did not compile alone (E8-8); the others are `4e20a01` benchmark, specs, environments, docs; `2e02f98` cluster validation and
 node-key upgrade; `f571db6` platform upgrade; `18c5784` E10-1 replay; `5789ebd` README and board; `13b10c5` E3-14 matrix; `de3c192` E3-14 default 2000
-and E9-10 part 1. The pre-squash history is on the local branch `backup/pre-squash` (delete it once pushed).
+and E9-10 part 1.
 
 Suite: **211 tests, 0 failures, 10 skipped** (full run 2026-11-04 on JDK 25, including `CeilingRunnerSpecification`'s 7) (4 need external infrastructure; the rest are the cluster specs, run only with
 `RUN_CLUSTER_TESTS=Y`). No containers are running.
@@ -83,8 +83,8 @@ Suite: **211 tests, 0 failures, 10 skipped** (full run 2026-11-04 on JDK 25, inc
 ## Decisions waiting for a human
 1. **Default for `WRITER_THREADS`** (now 1, keeps batch order; more is up to 3.9x faster on messages that do not share nodes but a node
    in two batches can commit in either order). Leave at 1, set 4 where order across batches does not matter, or build E4-3 first.
-2. **Commit history**: squash the first three commits into one buildable commit (E8-8), and commit the cluster work. Local and unpushed.
-3. **E10-1 next step:** find out why the replay is slower than the server (feed rows from a producer thread rather than pre-built memory), or define the ceiling another way. Separately and cheaper: decide E3-14 (`BATCH_SIZE` 2000).
+2. ~~Commit history~~ done 2026-11-05 (E8-8): squashed and pushed.
+3. **E10-1 next step:** find out why the replay is slower than the server (feed rows from a producer thread rather than pre-built memory), or define the ceiling another way. (E3-14 is decided: 2000.)
 4. **Retry window** (E5-8): the driver rides through 30 s, a killed leader takes 37 s; longer outages requeue, which is verified safe.
 5. E7-3 (dependency audit, "latest drivers for the whole stack") is defined, not started.
 
@@ -122,3 +122,10 @@ RUN_CLUSTER_TESTS=Y ./gradlew test --tests '*ClusterSpecification'              
 - E9-10 part 1 done: `ID_PROPERTY` / `CREATED_AT_PROPERTY` are config; old graphs: `CREATED_AT_PROPERTY=TheLinkAddedDate`. Part 2 (package name, image name, wire vocabulary) is E9-10b and needs decisions from the owner.
 - Suite: 211 tests, 0 failures, 10 skipped on JDK 25. Gotcha: a spec that wipes JVM system properties (`System.setProperties(new Properties())`) hangs the Gradle test worker when anything fails. Don't.
 - New benchmark tool: `./gradlew bisect` (`BisectCost`): cost of one bad message and message sizes.
+
+## 2026-11-09 update (reboot point)
+- **Pushed:** `origin/main` = local `main`, working tree clean, no other branches. The three oldest commits were squashed (E8-8) and the result built in a clean worktree. Suite last run 2026-11-04: 211 tests, 0 failures, 10 skipped (JDK 25).
+- **Owner's intent for the repo:** open source, used to illustrate the harvest/refinery pattern. If it resonates it moves to Neo4j Labs; otherwise it is paused as is. Before a Labs move, do E9-10b (package name, `menome/message-server` image in CI and `Jenkinsfile`, wire vocabulary alias or keep).
+- **To resume after a reboot:** Docker Desktop must be running (tests use Testcontainers; benchmarks use `docker-compose.benchmark.yml`, port 7688). Build with `JAVA_HOME=/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home`. No containers or background jobs are left running. Never run two `./gradlew test` at once.
+- **Not demonstrated:** "faster than anything else". No Kafka or Spark comparison (E10-2) exists, and the E10-1 replay is a lower bound, not a ceiling (the server ran at 104-135% of it, cause unexplained).
+- **Open and unmeasured:** the 2 s `bufferTimeout` (reasoned, not measured, not configurable); node-only at 1 writer is noisy (~25% run to run); `WRITER_THREADS` default (1 vs 4).

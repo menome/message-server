@@ -2,7 +2,7 @@
 
 Single source of truth for planned work (kanban lives in MD files in git, by standing decision). Move a story by
 cutting it to the next column. Priority: P0 do first, P1 next, P2 later. Size: S <1d, M 1-3d, L 3-5d.
-Background and numbers: `docs/THROUGHPUT.md`, measured results in `docs/benchmarks/README.md`. Last updated 2026-11-05
+Background and numbers: `docs/THROUGHPUT.md`, measured results in `docs/benchmarks/README.md`. Last updated 2026-11-09 (all work pushed; nothing in progress except the unfinished E10-1 remainder below)
 (P0: E3-7 partly done, plus E10-1 in progress). Move a story to In progress when you start it and to Done, with what was measured, when you finish.
 
 ## Goal
